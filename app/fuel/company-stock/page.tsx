@@ -124,7 +124,7 @@ export default function CompanyFuelStock() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>⛽ Main Tank Stock</h1>
+            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}> Main Tank Stock</h1>
             <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               Real-time fuel stock levels from main tanks
             </p>
@@ -141,7 +141,7 @@ export default function CompanyFuelStock() {
   
   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
     <div>
-      <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-red-900'}`}>📊 Total Fuel Stock</h2>
+      <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-red-900'}`}> Total Fuel Stock</h2>
       <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-900'}`}>Total Capacity: {totalCapacity.toLocaleString()} Liters</p>
       {/* CHANGE 2: Dark mode text color from 'text-gray-400' to 'text-gray-300' for better contrast */}
     </div>
@@ -205,7 +205,7 @@ export default function CompanyFuelStock() {
         <div className={`rounded-xl shadow-sm border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
           <div className={`p-4 border-b ${userBackground === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
             <div className="flex items-center justify-between">
-              <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>📋 Current Main Tank Levels</h2>
+              <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}> Current Main Tank Levels</h2>
               <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>🔒 View Only - Managed via Imports</span>
             </div>
           </div>

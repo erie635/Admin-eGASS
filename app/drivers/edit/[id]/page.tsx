@@ -292,7 +292,7 @@ export default function EditDriver() {
         
         if ((isOnlineChanged || statusChangedLocal) && !toastShownRef.current) {
           statusChanged = true;
-          statusMessage = `Driver status updated to ${data.isOnline ? '🟢 Online' : '⚪ Offline'} (from driver app)`;
+          statusMessage = `⚠️ Driver status updated to ${data.isOnline ? '🟢 Online' : '⚪ Offline'} (from driver app)`;
           addStatusUpdate(statusMessage);
           toastShownRef.current = true;
           setTimeout(() => { toastShownRef.current = false; }, 3000);
@@ -326,7 +326,7 @@ export default function EditDriver() {
               fuelChanged = true;
               const diff = (newFuel[typedKey] || 0) - (oldFuel[typedKey] || 0);
               const sign = diff > 0 ? '+' : '';
-              fuelMessage = `⛽ Fuel ${diff > 0 ? 'increased' : 'decreased'}: ${key} ${sign}${diff.toFixed(1)}L`;
+              fuelMessage = `⚠️ Fuel ${diff > 0 ? 'increased' : 'decreased'}: ${key} ${sign}${diff.toFixed(1)}L`;
               addStatusUpdate(fuelMessage);
               fuelToastShownRef.current = true;
               setTimeout(() => { fuelToastShownRef.current = false; }, 3000);
@@ -372,7 +372,7 @@ export default function EditDriver() {
       }
     }, (error) => {
       console.error('❌ Real-time listener error:', error);
-      if (isMountedRef.current) toast.error('Connection error. Retrying...');
+      if (isMountedRef.current) toast.error('❌ Connection error. Retrying...');
     });
   }, [driverId, addStatusUpdate]);
 
@@ -394,7 +394,7 @@ export default function EditDriver() {
           ))}
         </div>
         <div className={`text-[10px] ${userBackground === 'dark' ? 'text-gray-500' : 'text-gray-400'} mt-1 text-center border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} pt-1`}>
-          👆 Click anywhere outside or hover to close
+           Click anywhere outside or hover to close
         </div>
       </div>
     );
@@ -476,7 +476,7 @@ export default function EditDriver() {
       setFormData(prev => ({ ...prev, isOnline: newStatus, status: newStatus ? 'available' : 'offline' }));
       toast.success(`Driver is now ${newStatus ? '🟢 Online' : '⚪ Offline'}`);
     } catch (error: any) {
-      console.error('Error toggling status:', error);
+      console.error('❌ Error toggling status:', error);
       toast.error(error.code === 'not-found' ? 'Driver document not found. Please refresh and try again.' : 'Failed to update driver status');
     } finally {
       setUpdatingStatus(false);
@@ -528,7 +528,7 @@ export default function EditDriver() {
       emailCheckCache.current.set(cacheKey, exists);
       return exists;
     } catch (error) {
-      console.error('Error checking email:', error);
+      console.error('❌ Error checking email:', error);
       return false;
     }
   }, [driver?.email]);
@@ -561,9 +561,9 @@ export default function EditDriver() {
     const availableFuel = mainTankStock[fuelData.fuelType] || 0;
     
     if (name === 'amount' && numValue > availableFuel && availableFuel > 0) {
-      toast.error(`⚠️ Maximum available is ${availableFuel.toFixed(1)}L for ${fuelData.fuelType}`, {
+      toast.error(` Maximum available is ${availableFuel.toFixed(1)}L for ${fuelData.fuelType}`, {
         duration: 3000,
-        icon: '⚠️'
+        icon: ''
       });
       setFuelData(prev => ({ ...prev, [name]: availableFuel }));
       return;
@@ -588,7 +588,7 @@ export default function EditDriver() {
         try {
           await deleteObject(ref(storage, `drivers/${driverId}/profile`));
         } catch (error) {
-          console.log('ℹ️ No photo to delete:', error);
+          console.error('❌ No photo to delete:', error);
         }
       }
       
@@ -616,7 +616,7 @@ export default function EditDriver() {
     }
   };
 
-  // Updated handleFuelTopUp with strict main tank validation
+  // ✅ FIXED: handleFuelTopUp with correct adminName from logged-in user
   const handleFuelTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fuelData.fuelType || fuelData.amount <= 0) {
@@ -634,6 +634,36 @@ export default function EditDriver() {
       const fuelType = fuelData.fuelType;
       const companyRef = doc(db, 'company', 'fuelStock');
       const driverRef = doc(db, 'drivers', driverId);
+
+      // ✅ Get the current logged-in user for admin name
+      const currentUser = auth.currentUser;
+      let adminName = 'Admin';
+      let adminId = 'admin';
+      
+      if (currentUser) {
+        adminId = currentUser.uid;
+        // Try to get display name, fallback to email or 'Admin'
+        if (currentUser.displayName) {
+          adminName = currentUser.displayName;
+        } else if (currentUser.email) {
+          adminName = currentUser.email.split('@')[0];
+        }
+        
+        // Try to get full name from users collection
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.name) {
+              adminName = userData.name;
+            } else if (userData.displayName) {
+              adminName = userData.displayName;
+            }
+          }
+        } catch (error) {
+          console.log('ℹ️ Could not fetch user display name, using fallback:', error);
+        }
+      }
 
       const result = await runTransaction(db, async (transaction) => {
         const companySnap = await transaction.get(companyRef);
@@ -664,6 +694,7 @@ export default function EditDriver() {
           throw new Error(`INSUFFICIENT_FUEL:${mainTankAmount}:${amount}`);
         }
 
+        // ✅ FIXED: Use the adminName from logged-in user, NOT the driver's name
         const newHistoryEntry = {
           fuelType: fuelType,
           amount: amount,
@@ -671,14 +702,15 @@ export default function EditDriver() {
           newAmount: newDriverFuel,
           note: fuelData.note || 'Admin top-up from main tank',
           timestamp: new Date().toISOString(),
-          adminId: auth.currentUser?.uid || 'admin',
-          adminName: auth.currentUser?.displayName || 'Admin',
+          adminId: adminId,
+          adminName: adminName,  // ✅ This is the logged-in admin's name
           action: 'top-up',
           source: 'main-tank',
           mainTankBefore: mainTankAmount,
           mainTankAfter: newMainStock
         };
 
+        // ✅ FIXED: Also ensure company log uses the correct admin name
         const companyLogEntry = {
           fuelType: fuelType,
           amount: amount,
@@ -689,7 +721,7 @@ export default function EditDriver() {
           date: new Date().toLocaleString(),
           previousTankAmount: mainTankAmount,
           newTankAmount: newMainStock,
-          updatedBy: auth.currentUser?.displayName || 'Admin',
+          updatedBy: adminName,  // ✅ Use adminName, not driver name
           driverId: driverId,
           driverName: driverData.name || 'Unknown Driver',
           capacityInfo: `${newMainStock}/100000L`
@@ -731,7 +763,8 @@ export default function EditDriver() {
           driverFuelBefore: currentDriverFuel,
           driverFuelAfter: newDriverFuel,
           amount: amount,
-          fuelType: fuelType
+          fuelType: fuelType,
+          adminName: adminName
         };
       });
 
@@ -754,30 +787,30 @@ export default function EditDriver() {
           };
         });
 
-        toast.success(`✅ ${result.amount}L of ${result.fuelType} added to driver!`, {
+        toast.success(`✅ ${result.amount}L of ${result.fuelType} added to driver by ${result.adminName}!`, {
           duration: 4000,
-          icon: '⛽'
+          icon: ''
         });
 
         setShowFuelModal(false);
         setFuelData({ fuelType: 'Petrol', amount: 0, note: '' });
       }
     } catch (error: any) {
-      console.error('❌ Error topping up fuel:', error);
+      console.error(' Error topping up fuel:', error);
       
       if (error.message && error.message.includes('INSUFFICIENT_FUEL')) {
         const parts = error.message.split(':');
         if (parts.length === 3) {
           const available = parseFloat(parts[1]);
           const requested = parseFloat(parts[2]);
-          toast.error(`⛔ Not enough fuel in main tank! Available: ${available.toFixed(1)}L, Requested: ${requested.toFixed(1)}L. Please reduce the amount or import more fuel.`, {
+          toast.error(` Not enough fuel in main tank! Available: ${available.toFixed(1)}L, Requested: ${requested.toFixed(1)}L. Please reduce the amount or import more fuel.`, {
             duration: 5000,
-            icon: '🚫'
+            icon: ''
           });
         } else {
-          toast.error(`⛔ Not enough fuel in main tank! Please reduce the amount or import more fuel.`, {
+          toast.error(` Not enough fuel in main tank! Please reduce the amount or import more fuel.`, {
             duration: 5000,
-            icon: '🚫'
+            icon: ''
           });
         }
       } else {
@@ -909,9 +942,6 @@ export default function EditDriver() {
     return phone;
   };
 
-  // ============================================
-  // FIXED: Password update that works without invalid-credential error
-  // ============================================
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -947,10 +977,6 @@ export default function EditDriver() {
         return;
       }
 
-      // ============================================
-      // STEP 1: Try to create the account with the new password
-      // If it exists, it will fail with email-already-in-use
-      // ============================================
       try {
         const userCredential = await createUserWithEmailAndPassword(
           auth, 
@@ -958,11 +984,9 @@ export default function EditDriver() {
           passwordData.newPassword
         );
         
-        // Account created successfully
         const uid = userCredential.user.uid;
         await updateProfile(userCredential.user, { displayName: driverName || '' });
         
-        // Update Firestore with the new auth UID
         const driverRef = doc(db, 'drivers', driverId);
         await updateDoc(driverRef, {
           hasPasswordSet: true,
@@ -974,7 +998,7 @@ export default function EditDriver() {
         setHasExistingPassword(true);
         toast.success(`✅ Password created successfully for ${driverName}!`, {
           duration: 4000,
-          icon: '🔐'
+          icon: ''
         });
 
         setShowPasswordModal(false);
@@ -983,14 +1007,10 @@ export default function EditDriver() {
         return;
 
       } catch (error: any) {
-        // ============================================
-        // STEP 2: Account exists - Send password reset email
-        // ============================================
         if (error.code === 'auth/email-already-in-use') {
           try {
             await sendPasswordResetEmail(auth, driverEmail);
             
-            // Update Firestore
             const driverRef = doc(db, 'drivers', driverId);
             await updateDoc(driverRef, {
               passwordResetSent: new Date().toISOString(),
@@ -1012,7 +1032,7 @@ export default function EditDriver() {
             setPasswordData({ newPassword: '', confirmPassword: '' });
             
           } catch (resetError: any) {
-            console.error('❌ Reset email error:', resetError);
+            console.error(' Reset email error:', resetError);
             
             if (resetError.code === 'auth/user-not-found') {
               toast.error('Driver account not found. Please create the account first.');
@@ -1030,11 +1050,11 @@ export default function EditDriver() {
       }
 
     } catch (error: any) {
-      console.error('❌ Error updating password:', error);
+      console.error(' Error updating password:', error);
       if (error.code === 'auth/weak-password') {
         toast.error('Password is too weak. Use at least 6 characters with a mix of letters and numbers.');
       } else if (error.code === 'auth/email-already-in-use') {
-        toast.error('⚠️ Email already registered. A reset email has been sent.');
+        toast.error(' Email already registered. A reset email has been sent.');
       } else if (error.code === 'auth/too-many-requests') {
         toast.error('Too many requests. Please try again later.');
       } else {
@@ -1045,9 +1065,6 @@ export default function EditDriver() {
     }
   };
 
-  // ============================================
-  // Legacy createDriverAccount (kept for compatibility)
-  // ============================================
   const createDriverAccount = async (email: string, password: string, name: string, phone: string) => {
     try {
       const authInstance = auth;
@@ -1175,7 +1192,7 @@ export default function EditDriver() {
       }
       return { success: true };
     } catch (error: any) {
-      console.error('❌ Error creating driver account:', error);
+      console.error(' Error creating driver account:', error);
       throw error;
     }
   };
@@ -1238,15 +1255,13 @@ export default function EditDriver() {
     }
   };
 
-  // ============================================
-  // Driver Location Display with DIRECT COLORS
-  // ============================================
+  // Driver Location Display
   const DriverLocationDisplay = useMemo(() => {
     if (driver?.latitude === undefined || driver?.longitude === undefined) return null;
     return (
       <div className="p-4 rounded-lg border shadow-sm bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-white">📍 Live Location (from Flutter)</h3>
+          <h3 className="text-sm font-medium text-white"> Live Location (from Flutter)</h3>
           <span className="text-xs text-blue-200 animate-pulse">● Live</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
@@ -1272,15 +1287,13 @@ export default function EditDriver() {
           )}
         </div>
         {driver.lastUpdate && (
-          <p className="text-xs text-blue-200 mt-3">🕐 Last update: {new Date(driver.lastUpdate).toLocaleString()}</p>
+          <p className="text-xs text-blue-200 mt-3"> Last update: {new Date(driver.lastUpdate).toLocaleString()}</p>
         )}
       </div>
     );
   }, [driver?.latitude, driver?.longitude, driver?.speed, driver?.heading, driver?.lastUpdate]);
 
-  // ============================================
-  // RealTimeStatusIndicator with DIRECT COLORS
-  // ============================================
+  // RealTimeStatusIndicator
   const RealTimeStatusIndicator = () => (
     <div className="flex items-center gap-2">
       <div className="w-2 h-2 rounded-full animate-pulse bg-blue-500"></div>
@@ -1327,9 +1340,7 @@ export default function EditDriver() {
           {renderStatusUpdates()}
         </div>
 
-        {/* ============================================ */}
-        {/* Status Card with DIRECT COLOR - RED */}
-        {/* ============================================ */}
+        {/* Status Card */}
         <div className="rounded-xl shadow-sm p-4 border bg-red-100 border-red-200">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center space-x-4">
@@ -1455,7 +1466,6 @@ export default function EditDriver() {
               </div>
             </div>
 
-            {/* Rest of the form with theme-aware classes... */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Full Name *</label>
@@ -1524,7 +1534,7 @@ export default function EditDriver() {
             {driver?.remainingFuel && (
               <div className={`p-4 rounded-lg border ${userBackground === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>⛽ Driver Fuel Stock</h3>
+                  <h3 className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}> Driver Fuel Stock</h3>
                   <button type="button" onClick={() => setShowFuelModal(true)} className="px-3 py-1 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition">+ Top Up Fuel</button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1574,7 +1584,6 @@ export default function EditDriver() {
               </div>
             )}
 
-            {/* Password and other sections remain the same with theme-aware classes */}
             <div className={`p-4 rounded-lg border-2 ${hasExistingPassword ? userBackground === 'dark' ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-200' : userBackground === 'dark' ? 'bg-red-900/30 border-red-700' : 'bg-red-50 border-red-200'}`}>
               <div className="flex items-center justify-between">
                 <div>
@@ -1613,7 +1622,7 @@ export default function EditDriver() {
           </form>
         </div>
 
-        {/* Password Modal with theme-aware classes */}
+        {/* Password Modal */}
         {showPasswordModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className={`rounded-lg shadow-xl max-w-md w-full p-6 mx-4 ${getCardClass()}`}>
@@ -1676,12 +1685,12 @@ export default function EditDriver() {
           </div>
         )}
 
-        {/* Fuel Modal with theme-aware classes */}
+        {/* Fuel Modal */}
         {showFuelModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className={`rounded-lg shadow-xl max-w-md w-full p-6 mx-4 ${getCardClass()}`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900">⛽ Top Up Driver Fuel</h2>
+                <h2 className="text-xl font-bold text-gray-900"> Top Up Driver Fuel</h2>
                 <button type="button" onClick={() => setShowFuelModal(false)} className="text-gray-400 hover:text-gray-600">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />

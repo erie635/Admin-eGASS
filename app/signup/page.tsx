@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { auth, db } from '../../lib/firebase';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -25,7 +25,37 @@ export default function Signup() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<boolean>(false);
+  const [emailWarning, setEmailWarning] = useState<string>('');
+  const [isEmailValidating, setIsEmailValidating] = useState<boolean>(false);
   const router = useRouter();
+
+  // Debounced email validation on email input change
+  useEffect(() => {
+    if (!formData.email) {
+      setEmailWarning('');
+      return;
+    }
+
+    setIsEmailValidating(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const methods = await fetchSignInMethodsForEmail(auth, formData.email.trim());
+        if (methods.length > 0) {
+          setEmailWarning('This email is already registered. Please use a different one.');
+        } else {
+          setEmailWarning('');
+        }
+      } catch (error) {
+        // Optionally handle error, clear warning to not block user unnecessarily
+        setEmailWarning('');
+      } finally {
+        setIsEmailValidating(false);
+      }
+    }, 700); // 700ms debounce for better UX
+
+    return () => clearTimeout(timer);
+  }, [formData.email]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -33,50 +63,59 @@ export default function Signup() {
       ...prev,
       [name]: value
     }));
+
+    setError('');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+
     setError('');
 
     if (!formData.name) {
       setError('Please enter your full name');
-      setLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
-      setLoading(false);
       return;
     }
 
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
-      setLoading(false);
       return;
     }
 
+    if (emailWarning) {
+      setError(emailWarning);
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      console.log('Creating account for:', formData.email.trim());
-      
-      // Create user with email and password
+      // Optional: Re-check email one last time before signup to reduce race condition errors
+      const methods = await fetchSignInMethodsForEmail(auth, formData.email.trim());
+      if (methods.length > 0) {
+        setError('This email is already registered. Please login instead.');
+        toast.error('Email already in use');
+        setLoading(false);
+        return;
+      }
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email.trim(),
         formData.password
       );
-      
-      const user = userCredential.user;
-      console.log('User created successfully:', user.uid);
 
-      // Update profile with display name
+      const user = userCredential.user;
+
       await updateProfile(user, {
         displayName: formData.name.trim()
       });
 
-      // Save user data to Firestore with 'user' role (not admin)
       await setDoc(doc(db, 'users', user.uid), {
         name: formData.name.trim(),
         email: formData.email.trim(),
@@ -85,20 +124,15 @@ export default function Signup() {
         updatedAt: new Date().toISOString()
       });
 
-      console.log('User data saved to Firestore');
-      
       setSuccess(true);
       toast.success('Account created successfully!');
-      
-      // Navigate to login after 2 seconds
+
       setTimeout(() => {
         router.push('/login');
       }, 2000);
 
     } catch (error: any) {
-      console.error('Signup Error:', error);
-      console.error('Error code:', error.code);
-      
+      // Handle signup errors, including race condition cases
       switch (error.code) {
         case 'auth/email-already-in-use':
           setError('This email is already registered. Please login instead.');
@@ -129,10 +163,8 @@ export default function Signup() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4">
         <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-            </svg>
+          <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center mx-auto mb-6">
+            <img src="/images/logo.png" alt="Logo" className="w-20 h-20 object-contain" />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">✅ Account Created!</h2>
           <p className="text-gray-600 mb-4">Your account has been created successfully.</p>
@@ -153,10 +185,8 @@ export default function Signup() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+            <img src="/images/logo.png" alt="Logo" className="w-25 h-25 object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Create Account</h1>
           <p className="text-gray-500 text-sm mt-2">Create your account to get started</p>
@@ -189,9 +219,16 @@ export default function Signup() {
               value={formData.email}
               onChange={handleChange}
               placeholder="you@example.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                emailWarning ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'
+              }`}
               required
             />
+            {emailWarning && (
+              <p className="text-xs text-red-600 mt-1">
+                {emailWarning}
+              </p>
+            )}
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
@@ -222,7 +259,7 @@ export default function Signup() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !!emailWarning || isEmailValidating}
             className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-md transition disabled:opacity-50"
           >
             {loading ? 'Creating Account...' : 'Create Account'}

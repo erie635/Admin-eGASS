@@ -253,11 +253,11 @@ export default function FuelTanks() {
           setFilteredActivities(data.activityLog || []);
         }
         
-        toast.success(`⛽ ${amount}L ${fuelType} deducted - Remaining: ${result.newAmount.toFixed(1)}L`, { duration: 4000, icon: '📦' });
+        toast.success(` ${amount}L ${fuelType} deducted - Remaining: ${result.newAmount.toFixed(1)}L`, { duration: 4000, icon: '📦' });
       }
     } catch (error) {
       console.error('Error performing fuel deduction:', error);
-      toast.error(`❌ ${error.message}`);
+      toast.error(` ${error.message}`);
     } finally {
       setTimeout(() => processingQueueRef.current.delete(dedupKey), 5000);
     }
@@ -291,7 +291,7 @@ export default function FuelTanks() {
       }
     } catch (error) {
       console.error('Error performing fuel addition:', error);
-      toast.error(`❌ ${error.message}`);
+      toast.error(` ${error.message}`);
     } finally {
       setTimeout(() => processingQueueRef.current.delete(dedupKey), 5000);
     }
@@ -492,10 +492,10 @@ export default function FuelTanks() {
           </div>
 
           {isFull && (
-            <div className="mb-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-1 font-bold animate-pulse text-center">⛔ TANK IS FULL!</div>
+            <div className="mb-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-1 font-bold animate-pulse text-center"> TANK IS FULL!</div>
           )}
           {deliveredToday > 0 && (
-            <div className="mb-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-1">📦 {deliveredToday.toFixed(1)}L delivered today</div>
+            <div className="mb-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-1"> {deliveredToday.toFixed(1)}L delivered today</div>
           )}
 
           <div className="relative">
@@ -540,7 +540,7 @@ export default function FuelTanks() {
           {/* Info Message */}
           <div className="mt-3 text-center">
             <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'} border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} pt-2`}>
-              💡 Fuel is managed through imports and deliveries only
+               Fuel is managed through imports and deliveries only
             </p>
           </div>
         </div>
@@ -565,7 +565,7 @@ export default function FuelTanks() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">⛽ Fuel Tanks</h1>
+            <h1 className="text-2xl font-bold">  Fuel Tanks</h1>
             <p className={`text-sm mt-1 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               Real-time fuel stock levels with AI tank visualization
             </p>
@@ -600,8 +600,8 @@ export default function FuelTanks() {
           </div>
           <span className="text-xs ml-2 text-gray-500">{percentage.toFixed(0)}%</span>
         </div>
-        {isFull && <p className="text-xs text-red-600 mt-1 font-bold animate-pulse">🚫 FULL</p>}
-        {deliveredToday > 0 && <p className="text-xs text-blue-600 mt-1">📦 {deliveredToday.toFixed(1)}L today</p>}
+        {isFull && <p className="text-xs text-red-600 mt-1 font-bold animate-pulse"> FULL</p>}
+        {deliveredToday > 0 && <p className="text-xs text-blue-600 mt-1"> {deliveredToday.toFixed(1)}L today</p>}
       </div>
     );
   })}
@@ -617,7 +617,7 @@ export default function FuelTanks() {
           <div className={`rounded-xl shadow-sm p-6 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} ${getCardClass()}`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                📜 Activity Log 
+                 Activity Log 
                 <span className={`text-sm font-normal ml-2 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                   ({totalActivities} of {activityLog.length} activities)
                 </span>
@@ -657,7 +657,7 @@ export default function FuelTanks() {
                     <div key={`log-${index}`} className={`flex items-center justify-between p-3 rounded-lg text-sm ${userBackground === 'dark' ? 'bg-gray-800/50' : 'bg-gray-50'}`}>
                       <div className="flex items-center space-x-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${entry.action === 'add' ? 'bg-green-100 text-green-700' : entry.action === 'deduct' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                          {entry.action === 'add' ? '➕ Added' : entry.action === 'deduct' ? '📦 Delivered' : '➖ Removed'}
+                          {entry.action === 'add' ? ' Added' : entry.action === 'deduct' ? ' Delivered' : ' Removed'}
                         </span>
                         <span className={userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
                           {entry.actionType}: {entry.amount}L {entry.fuelType}
@@ -667,7 +667,7 @@ export default function FuelTanks() {
                             <span className={`text-xs ml-2 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>Tank: {entry.previousTankAmount.toFixed(1)}L → {entry.newTankAmount.toFixed(1)}L</span>
                           )}
                           {entry.capacityInfo && (
-                            <span className="text-xs text-purple-600 ml-2 font-medium">📊 {entry.capacityInfo}</span>
+                            <span className="text-xs text-purple-600 ml-2 font-medium"> {entry.capacityInfo}</span>
                           )}
                         </span>
                       </div>
@@ -686,7 +686,7 @@ export default function FuelTanks() {
         <div className={`rounded-lg p-4 border ${userBackground === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-blue-200 bg-blue-50'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center space-x-4">
-              <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-blue-800'}`}>📊 Legend:</span>
+              <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-blue-800'}`}> Legend:</span>
               <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>🟢 Full (80%+)</span>
               <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>🟡 Moderate (50-80%)</span>
               <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>🟠 Low (20-50%)</span>

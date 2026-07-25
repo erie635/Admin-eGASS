@@ -23,6 +23,12 @@ interface Driver {
   todayTotalHours?: number;
   todayTotalMinutes?: number;
   dailyActivityId?: string;
+  remainingFuel?: {
+    Petrol?: number;
+    Diesel?: number;
+    Kerosene?: number;
+    'V-Power'?: number;
+  };
 }
 
 interface DriverWithDuration extends Driver {
@@ -88,7 +94,15 @@ export default function DriversPage() {
     }
   };
 
-  // ✅ FIXED: Function to calculate and save daily activity
+  // Function to format fuel value
+  const formatFuelValue = (value: number | undefined) => {
+    if (value === undefined || value === null || value === 0) {
+      return '0L';
+    }
+    return `${value.toFixed(2)}L`;
+  };
+
+  // Function to calculate and save daily activity
   const updateDailyActivity = async (driver: Driver) => {
     try {
       const today = new Date();
@@ -223,8 +237,8 @@ export default function DriversPage() {
             offlineSince: data.offlineSince?.toDate?.() || data.offlineSince || null,
             lastStatusChange: data.lastStatusChange?.toDate?.() || data.lastStatusChange || null,
             todayStartTime: data.todayStartTime?.toDate?.() || data.todayStartTime || null,
-            // ✅ Ensure isOnline is a boolean
             isOnline: data.isOnline ?? false,
+            remainingFuel: data.remainingFuel || {},
           };
         }) as Driver[];
 
@@ -298,13 +312,15 @@ export default function DriversPage() {
               Manage all drivers in the system
             </p>
           </div>
-          <Link 
-            href="/drivers/add" 
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2"
-          >
-            <span>+</span>
-            <span>Add Driver</span>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link 
+              href="/drivers/add" 
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2"
+            >
+              <span>+</span>
+              <span>Add Driver</span>
+            </Link>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -314,10 +330,11 @@ export default function DriversPage() {
             placeholder="Search drivers by name, email, phone or plate number..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-200 border-gray-800"
+            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-200 border-gray-300"
           />
         </div>
 
+        {/* Drivers Table */}
         <div className={`rounded-xl shadow-sm border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
           <div className={`p-6 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
             <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>All Drivers</h2>

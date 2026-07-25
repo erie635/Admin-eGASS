@@ -211,17 +211,17 @@ export default function SalesReport() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className={`rounded-xl shadow-lg p-6 border ${userBackground === 'dark' ? 'border-emerald-800' : 'border-emerald-200'} ${getCardClass()} bg-emerald-500 dark:bg-emerald-900 hover:bg-emerald-600 dark:hover:bg-emerald-800 transition-all duration-300`}>
-              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-100 dark:text-emerald-300">💰 Total Revenue</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-100 dark:text-emerald-300"> Total Revenue</p>
               <p className="text-3xl font-bold text-white dark:text-emerald-100 mt-1">KES {totalStats.totalRevenue.toLocaleString()}</p>
             </div>
 
             <div className={`rounded-xl shadow-lg p-6 border ${userBackground === 'dark' ? 'border-sky-800' : 'border-sky-200'} ${getCardClass()} bg-sky-500 dark:bg-sky-900 hover:bg-sky-600 dark:hover:bg-sky-800 transition-all duration-300`}>
-              <p className="text-sm font-semibold uppercase tracking-wider text-sky-100 dark:text-sky-300">⛽ Total Litres Sold</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-sky-100 dark:text-sky-300"> Total Litres Sold</p>
               <p className="text-3xl font-bold text-white dark:text-sky-100 mt-1">{totalStats.totalLitres.toLocaleString()}L</p>
             </div>
 
             <div className={`rounded-xl shadow-lg p-6 border ${userBackground === 'dark' ? 'border-violet-800' : 'border-violet-200'} ${getCardClass()} bg-violet-500 dark:bg-violet-900 hover:bg-violet-600 dark:hover:bg-violet-800 transition-all duration-300`}>
-              <p className="text-sm font-semibold uppercase tracking-wider text-violet-100 dark:text-violet-300">📦 Total Orders</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-violet-100 dark:text-violet-300"> Total Orders</p>
               <p className="text-3xl font-bold text-white dark:text-violet-100 mt-1">{totalStats.totalOrders}</p>
             </div>
           </div>

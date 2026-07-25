@@ -2,86 +2,140 @@
 
 import { useState } from 'react';
 import { auth, db } from '../../lib/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 export default function Login() {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (loading) return;
+
     setLoading(true);
     setError('');
 
-    if (!email || !password) {
-      setError('Please enter both email and password');
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+
+    // Validate inputs before attempting login
+    if (!trimmedEmail || !trimmedPassword) {
+      setError('Please enter both email and password.');
+      toast.error('Missing credentials');
       setLoading(false);
       return;
     }
 
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
     try {
-      console.log('Attempting login for:', trimmedEmail);
-      
+      console.clear();
+
+      console.log('========== LOGIN ==========');
+      console.log('Project:', auth.app.options.projectId);
+      console.log('Email:', trimmedEmail);
+      console.log('Password Length:', trimmedPassword.length);
+
       // Attempt sign in
-      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        trimmedEmail,
+        trimmedPassword
+      );
+
       const user = userCredential.user;
-      
+
       console.log('Login successful:', user.uid);
 
-      // Check if user exists in Firestore, if not create a user document
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
+      // Get Firestore user document
+      const userRef = doc(db, 'users', user.uid);
+      let userDoc = await getDoc(userRef);
+
+      // If user document doesn't exist, create one with admin role
       if (!userDoc.exists()) {
-        // Create user document if it doesn't exist
-        await setDoc(doc(db, 'users', user.uid), {
-          email: user.email,
-          name: user.displayName || 'User',
-          role: 'user',
+        console.log('User document missing. Creating with admin role...');
+        
+        await setDoc(userRef, {
+          name: user.displayName || trimmedEmail.split('@')[0],
+          email: trimmedEmail,
+          role: 'admin',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
-        console.log('User document created');
+        
+        console.log('User document created with admin role');
+      } else {
+        // If document exists but doesn't have admin role, update it
+        const userData = userDoc.data();
+        if (userData.role !== 'admin' && userData.role !== 'super_admin') {
+          console.log('Updating user role to admin...');
+          await setDoc(userRef, {
+            ...userData,
+            role: 'admin',
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+          console.log('User role updated to admin');
+        }
       }
 
-      // ✅ Allow ANY authenticated user to access the dashboard
-      toast.success(`Welcome!`);
+      // Login successful - redirect to dashboard
+      toast.success('Welcome!');
       router.push('/dashboard');
       
-    } catch (error: any) {
-      console.error('Login error:', error);
-      console.error('Error code:', error.code);
-      
-      switch (error.code) {
-        case 'auth/invalid-credential':
-          setError('Invalid email or password. Please check your credentials.');
-          toast.error('Invalid credentials');
+    } catch (err: any) {
+      // Handle all errors gracefully without console noise
+      console.log('================================');
+      console.log('Login attempt failed');
+      console.log('Code:', err.code);
+      console.log('Message:', err.message);
+      console.log('================================');
+
+      switch (err.code) {
+        case 'auth/invalid-email':
+          setError('Invalid email address. Please enter a valid email.');
+          toast.error('Invalid email');
           break;
+
         case 'auth/user-not-found':
-          setError('No account found. Please sign up first.');
+          setError('No account found with this email. Please sign up first.');
           toast.error('Account not found');
           break;
+
         case 'auth/wrong-password':
           setError('Incorrect password. Please try again.');
           toast.error('Wrong password');
           break;
-        case 'auth/too-many-requests':
-          setError('Too many attempts. Please try again later.');
-          toast.error('Too many attempts');
+
+        case 'auth/invalid-credential':
+          setError('Incorrect email or password. Please try again.');
+          toast.error('Invalid email or password');
           break;
+
+        case 'auth/user-disabled':
+          setError('This account has been disabled. Please contact support.');
+          toast.error('User disabled');
+          break;
+
         case 'auth/network-request-failed':
           setError('Network error. Please check your internet connection.');
           toast.error('Network error');
           break;
+
+        case 'auth/too-many-requests':
+          setError('Too many failed attempts. Please try again later.');
+          toast.error('Too many attempts');
+          break;
+
         default:
           setError('Login failed. Please try again.');
           toast.error('Login failed');
@@ -95,35 +149,46 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+            <img src="/images/logo.png" alt="Logo" className="w-25 h-25 object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Welcome Back</h1>
-          <p className="text-gray-500 text-sm mt-2">Sign in to your account</p>
+
+          <h1 className="text-2xl font-bold text-gray-800">
+            Admin Login
+          </h1>
+
+          <p className="text-gray-500 text-sm mt-2">
+            Sign in to manage your fuel delivery system
+          </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-400 text-red-700 rounded-md text-sm">
-            <strong>Error:</strong> {error}
+          <div className="mb-4 p-3 bg-red-50 border border-red-400 text-red-700 rounded-md">
+            {error}
           </div>
         )}
 
         <form onSubmit={handleLogin}>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Address
+            </label>
+
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="admin@efuel.com"
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               required
             />
           </div>
+
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Password
+            </label>
+
             <input
               type="password"
               value={password}
@@ -133,6 +198,7 @@ export default function Login() {
               required
             />
           </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -141,14 +207,18 @@ export default function Login() {
             {loading ? 'Logging in...' : 'Sign In'}
           </button>
         </form>
-        
+
         <div className="mt-6 text-center space-y-2">
           <p className="text-sm text-gray-500">
             Don't have an account?{' '}
-            <Link href="/signup" className="text-green-600 hover:text-green-800 font-medium">
-              Create Account
+            <Link
+              href="/signup"
+              className="text-green-600 hover:text-green-800 font-medium"
+            >
+              Sign Up
             </Link>
           </p>
+
           <p className="text-xs text-gray-400">
             Need help? Contact your system administrator
           </p>

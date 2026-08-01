@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../../../lib/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -22,6 +22,9 @@ export default function SalesReport() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [isFiltering, setIsFiltering] = useState(false);
+
+  // Ref to store unsubscribe function for cleanup
+  const unsubscribeRef = useRef(null);
 
   // Fetch user background
   useEffect(() => {
@@ -45,17 +48,15 @@ export default function SalesReport() {
     fetchUserBackground();
   }, []);
 
+  // Setup real-time listener on drivers collection for sales data
   useEffect(() => {
-    fetchSalesData();
-  }, []);
-
-  async function fetchSalesData() {
     setLoading(true);
-    try {
-      const driversSnapshot = await getDocs(collection(db, 'drivers'));
+    const driversCollection = collection(db, 'drivers');
+
+    const unsubscribe = onSnapshot(driversCollection, (snapshot) => {
       const allSales = [];
 
-      driversSnapshot.docs.forEach(doc => {
+      snapshot.docs.forEach(doc => {
         const data = doc.data();
         if (data.salesHistory) {
           data.salesHistory.forEach(sale => {
@@ -83,13 +84,23 @@ export default function SalesReport() {
 
       setSalesData(sortedSales);
       setFilteredSales(sortedSales);
-    } catch (error) {
-      console.error('Error fetching sales data:', error);
-      toast.error('Failed to load sales data');
-    } finally {
       setLoading(false);
-    }
-  }
+    }, (error) => {
+      console.error('Error in real-time sales data listener:', error);
+      toast.error('Failed to load sales data');
+      setLoading(false);
+    });
+
+    unsubscribeRef.current = unsubscribe;
+
+    // Cleanup on unmount
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+    };
+  }, []);
 
   // Filter sales by date
   const filterSalesByDate = () => {
@@ -292,7 +303,7 @@ export default function SalesReport() {
 
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className={userBackground === 'dark' ? 'bg-gray-800' : 'bg-gray-600'}>
+                <thead className={userBackground === 'dark' ? 'bg-red-900' : 'bg-red-900'}>
                   <tr>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Date</th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Driver</th>

@@ -324,7 +324,7 @@ export default function DriversPage() {
         </div>
 
         {/* Search Bar */}
-        <div className="rounded-xl shadow-sm p-4 border bg-cyan-200 border-gray-200">
+        <div className="rounded-xl shadow-sm p-4 border bg-cyan-700 border-gray-200">
           <input
             type="text"
             placeholder="Search drivers by name, email, phone or plate number..."
@@ -342,7 +342,7 @@ export default function DriversPage() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className={userBackground === 'dark' ? 'bg-gray-800' : 'bg-gray-600'}>
+              <thead className={userBackground === 'dark' ? 'bg-red-900' : 'bg-red-900'}>
                 <tr>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Name</th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Email</th>

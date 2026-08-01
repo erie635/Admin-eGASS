@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 export default function AddDriver() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const emailTimeout = useRef<NodeJS.Timeout | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -23,6 +24,11 @@ export default function AddDriver() {
   const [passwordMatchError, setPasswordMatchError] = useState(false);
   const [userBackground, setUserBackground] = useState<string>('white');
   const [authEmailExists, setAuthEmailExists] = useState(false);
+  const [emailCheckComplete, setEmailCheckComplete] = useState(false);
+  const [emailValidFormat, setEmailValidFormat] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
+  const [emailAvailabilityMessage, setEmailAvailabilityMessage] = useState('');
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -124,30 +130,79 @@ export default function AddDriver() {
 
   // Check if email already exists in Firebase Authentication
   const checkAuthEmailExists = useCallback(async (email: string) => {
-    if (!email || email.trim() === '') return false;
+    if (!email || email.trim() === '') {
+      setEmailAvailabilityMessage('');
+      return false;
+    }
 
     const emailTrimmed = email.trim();
 
     // Simple regex validation for email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailTrimmed)) {
-      return false; // Invalid email format; don't call Firebase yet
+      setEmailValidFormat(false);
+      setEmailAvailabilityMessage('⚠️ Please enter a valid email address');
+      return false;
     }
+    setEmailValidFormat(true);
 
     try {
       const methods = await fetchSignInMethodsForEmail(auth, emailTrimmed);
-      return methods.length > 0;
-    } catch (error) {
+      const exists = methods.length > 0;
+      setAuthEmailExists(exists);
+      setIsEmailVerified(exists);
+      setEmailCheckComplete(true);
+      setNetworkError(false);
+
+      if (exists) {
+        setEmailAvailabilityMessage(`❌ ${email.trim()} is already registered.`);
+        toast.error(`${email.trim()} is already in use.`, {
+          duration: 3000,
+          icon: '🚫',
+        });
+      } else {
+        setEmailAvailabilityMessage('✅ Email is available!');
+        toast.success('✅ Email is available!', {
+          duration: 2000,
+          icon: '✅'
+        });
+      }
+
+      return exists;
+    } catch (error: any) {
       console.error('Error checking auth email:', error);
+
+      // Handle network errors only - remove the signInWithEmailAndPassword fallback
+      if (error.code === 'auth/network-request-failed' || error.message?.includes('network')) {
+        setNetworkError(true);
+        setEmailAvailabilityMessage('🌐 Network error - Please check your connection');
+        toast.error('🌐 Network error: Please check your internet connection.', {
+          duration: 4000,
+          icon: '🌐'
+        });
+        setEmailCheckComplete(false);
+      } else {
+        setEmailAvailabilityMessage('⚠️ Error checking email availability');
+        setEmailCheckComplete(true);
+      }
+
       return false;
     }
   }, []);
 
   // Check if email already exists in drivers collection
   const checkEmailExists = useCallback(async (email: string) => {
-    if (!email || email.trim() === '') return false;
+    if (!email || email.trim() === '') {
+      setEmailCheckComplete(false);
+      setEmailAvailabilityMessage('');
+      return false;
+    }
 
     setEmailChecking(true);
+    setEmailCheckComplete(false);
+    setNetworkError(false);
+    setEmailAvailabilityMessage('🔍 Checking email...');
+
     try {
       // Check Firestore first
       const driversRef = collection(db, 'drivers');
@@ -159,16 +214,36 @@ export default function AddDriver() {
       const authExists = await checkAuthEmailExists(email);
 
       const exists = firestoreExists || authExists;
-      setAuthEmailExists(authExists);
+      setEmailError(exists);
+      setAuthEmailExists(exists);
+      
+      if (firestoreExists) {
+        const usedEmail = querySnapshot.docs[0].data().email;
+        setEmailAvailabilityMessage(`❌ ${usedEmail} is already in use.`);
+        toast.error(`${usedEmail} is already in use.`, {
+          duration: 3000,
+          icon: '🚫',
+        });
+        return true;
+      }
 
       return exists;
     } catch (error) {
       console.error('Error checking email:', error);
+      setNetworkError(true);
+      setEmailAvailabilityMessage('🌐 Could not verify email. Please check your connection.');
+      toast.error('🌐 Could not verify email. Please check your connection.', {
+        duration: 4000,
+        icon: '🌐'
+      });
       return false;
     } finally {
       setEmailChecking(false);
+      if (!networkError) {
+        setEmailCheckComplete(true);
+      }
     }
-  }, [checkAuthEmailExists]);
+  }, [checkAuthEmailExists, networkError]);
 
   const handleChange = useCallback((e) => {
     const { name, value, type } = e.target;
@@ -179,14 +254,27 @@ export default function AddDriver() {
       [name]: newValue
     }));
 
-    // Debounced email check
+    // Reset network error when user starts typing
     if (name === 'email' && value) {
-      clearTimeout((window as any).emailTimeout);
-      (window as any).emailTimeout = setTimeout(async () => {
-        const exists = await checkEmailExists(value);
-        setEmailError(exists);
-        if (exists) {
-          toast.error('⚠️ This email is already used by another driver!');
+      setNetworkError(false);
+      setEmailAvailabilityMessage('🔍 Checking email...');
+
+      // Validate email format immediately
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      setEmailValidFormat(emailRegex.test(value));
+
+      // Use emailTimeout ref instead of window.emailTimeout
+      if (emailTimeout.current) {
+        clearTimeout(emailTimeout.current);
+      }
+
+      emailTimeout.current = setTimeout(async () => {
+        if (value && emailRegex.test(value)) {
+          const exists = await checkEmailExists(value);
+          setEmailError(exists);
+          setAuthEmailExists(exists);
+        } else if (value && !emailRegex.test(value)) {
+          setEmailAvailabilityMessage('⚠️ Please enter a valid email address');
         }
       }, 500);
     }
@@ -306,17 +394,46 @@ export default function AddDriver() {
   // ========== CREATE FIREBASE AUTH ACCOUNT ==========
   const createDriverAuthAccount = useCallback(async (email: string, password: string, name: string) => {
     try {
-      // Double check if email exists in Auth before creating
+      // IMPORTANT: Double check if email exists in Auth before creating
+      // This is the final check before attempting to create
       const authExists = await checkAuthEmailExists(email);
+
       if (authExists) {
-        toast.error('⚠️ This email is already registered in Firebase Auth. Please use a different email.', {
-          duration: 5000,
-          icon: '🚫'
+        // Use email parameter instead of formData.email
+        toast.error(`${email} is already registered.`, {
+          duration: 3000,
+          icon: '🚫',
         });
+        setEmailAvailabilityMessage(`❌ ${email} is already registered.`);
+        setAuthEmailExists(true);
+        setEmailError(true);
         return { success: false, error: 'Email already in use', code: 'auth/email-already-in-use' };
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // Try to create the user
+      console.log('🔐 Attempting to create auth account for:', email);
+
+      let userCredential;
+      try {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      } catch (error: any) {
+        if (error.code === 'auth/email-already-in-use') {
+          toast.error(`${email} is already registered.`, {
+            duration: 3000,
+            icon: '🚫',
+          });
+          setEmailAvailabilityMessage(`❌ ${email} is already registered.`);
+          setEmailError(true);
+          setAuthEmailExists(true);
+          return {
+            success: false,
+            code: error.code,
+          };
+        }
+        // Re-throw any other Firebase error
+        throw error;
+      }
+
       const user = userCredential.user;
 
       await updateProfile(user, {
@@ -329,11 +446,15 @@ export default function AddDriver() {
     } catch (authError: any) {
       console.error('❌ Auth error:', authError);
 
+      // Handle specific error codes
       if (authError.code === 'auth/email-already-in-use') {
-        toast.error('⚠️ This email is already registered. Please use a different email.', {
-          duration: 5000,
+        toast.error(`${email} is already registered.`, {
+          duration: 4000,
           icon: '🚫'
         });
+        setEmailError(true);
+        setAuthEmailExists(true);
+        setEmailAvailabilityMessage(`❌ ${email} is already registered.`);
         return { success: false, error: 'Email already in use', code: authError.code };
       } else if (authError.code === 'auth/weak-password') {
         toast.error('⚠️ Password too weak. Use at least 6 characters.', {
@@ -341,7 +462,21 @@ export default function AddDriver() {
           icon: '⚠️'
         });
         return { success: false, error: 'Weak password' };
+      } else if (authError.code === 'auth/invalid-email') {
+        toast.error('⚠️ Invalid email address format.', {
+          duration: 4000,
+          icon: '⚠️'
+        });
+        return { success: false, error: 'Invalid email' };
+      } else if (authError.code === 'auth/network-request-failed' || authError.message?.includes('network')) {
+        toast.error('🌐 Network error: Please check your internet connection.', {
+          duration: 5000,
+          icon: '🌐'
+        });
+        setNetworkError(true);
+        return { success: false, error: 'Network error', code: authError.code };
       } else {
+        // Re-throw other errors
         throw authError;
       }
     }
@@ -374,17 +509,24 @@ export default function AddDriver() {
       return;
     }
 
-    // Check if email already exists (Firestore + Auth)
-    const emailExists = await checkEmailExists(formData.email);
-    if (emailExists) {
-      toast.error('⚠️ This email is already used by another driver!');
-      setEmailError(true);
-      return;
-    }
-
+    // FINAL CHECK: Verify email doesn't exist before proceeding
     setLoading(true);
 
     try {
+      // Do a fresh check for email existence
+      const emailExists = await checkEmailExists(formData.email);
+
+      if (emailExists) {
+        toast.error(`❌ ${formData.email} is already taken! Please use a different email.`, {
+          duration: 4000,
+          icon: '🚫'
+        });
+        setEmailAvailabilityMessage(`❌ ${formData.email} is already registered. Please use a different email.`);
+        setEmailError(true);
+        setLoading(false);
+        return;
+      }
+
       // STEP 1: Create Firebase Auth Account with the provided password
       const authResult = await createDriverAuthAccount(
         formData.email,
@@ -394,6 +536,22 @@ export default function AddDriver() {
 
       if (!authResult.success) {
         setLoading(false);
+        // Handle specific error cases
+        if (authResult.code === 'auth/email-already-in-use') {
+          toast.error(`❌ ${formData.email} is already taken! Please use a different email.`, {
+            duration: 4000,
+            icon: '🚫'
+          });
+          setEmailAvailabilityMessage(`❌ ${formData.email} is already registered. Please use a different email.`);
+          setEmailError(true);
+          setAuthEmailExists(true);
+        } else if (authResult.code === 'auth/network-request-failed') {
+          toast.error('🌐 Network error: Please check your internet connection and try again.', {
+            duration: 5000,
+            icon: '🌐'
+          });
+          setNetworkError(true);
+        }
         return;
       }
 
@@ -406,55 +564,32 @@ export default function AddDriver() {
       // COMPLETE DRIVER DOCUMENT WITH AUTH UID AS DOCUMENT ID
       // ============================================================
       const driverData = {
-        // ============================================================
-        // BASIC INFO
-        // ============================================================
         userId: authUid,
         name: formData.name,
         phone: formattedPhone,
         email: formData.email,
         userType: 'driver',
-
-        // ============================================================
-        // VEHICLE INFO
-        // ============================================================
         vehicleType: formData.vehicleType || 'Pending Assignment',
         numberPlate: formData.numberPlate || 'Pending Assignment',
         pricePerKm: parseFloat(formData.pricePerKm) || 0,
         license: formData.license || '',
-
-        // ============================================================
-        // STATUS & APPROVAL
-        // ============================================================
         isApproved: true,
         isOnline: formData.isOnline || false,
         isAvailable: formData.isAvailable || false,
         status: formData.status || 'offline',
         orderAccepted: false,
-
-        // ============================================================
-        // LOCATION & SPEED
-        // ============================================================
         lat: parseFloat(formData.lat) || 0.0,
         lng: parseFloat(formData.lng) || 0.0,
         latitude: parseFloat(formData.lat) || 0.0,
         longitude: parseFloat(formData.lng) || 0.0,
         heading: parseFloat(formData.heading) || 0.0,
         speed: parseFloat(formData.speed) || 0.0,
-
-        // ============================================================
-        // ORDER TRACKING
-        // ============================================================
         activeOrderId: null,
         orderStartedAt: null,
         currentClientName: null,
         currentClientPhone: null,
         currentClientLocation: null,
         currentClientPhoto: null,
-
-        // ============================================================
-        // FUEL MANAGEMENT
-        // ============================================================
         remainingFuel: {
           Petrol: parseFloat(formData.remainingFuel.Petrol) || 0.0,
           Diesel: parseFloat(formData.remainingFuel.Diesel) || 0.0,
@@ -463,10 +598,6 @@ export default function AddDriver() {
         },
         fuelUpdatedAt: now,
         fuelHistory: [],
-
-        // ============================================================
-        // SALES & REVENUE
-        // ============================================================
         salesHistory: [],
         totalFuelSoldToday: parseFloat(formData.totalFuelSoldToday) || 0.0,
         totalRevenueToday: parseFloat(formData.totalRevenueToday) || 0.0,
@@ -476,26 +607,14 @@ export default function AddDriver() {
         lastSaleAmount: 0.0,
         lastSaleTime: null,
         lastOrderTime: null,
-
-        // ============================================================
-        // ORDER STATISTICS
-        // ============================================================
         totalOrders: parseInt(formData.totalOrders) || 0,
         completedOrders: parseInt(formData.completedOrders) || 0,
         lastCompletedOrderAt: null,
-
-        // ============================================================
-        // ONLINE/OFFLINE HISTORY
-        // ============================================================
         onlineHistory: [],
         offlineHistory: [],
         lastOnlineTime: formData.isOnline ? now : null,
         lastOfflineTime: !formData.isOnline ? now : null,
         lastUpdate: now,
-
-        // ============================================================
-        // PROFILE & METADATA
-        // ============================================================
         profileComplete: true,
         driverPhoto: null,
         photoURL: null,
@@ -503,10 +622,6 @@ export default function AddDriver() {
         driverSince: now,
         createdAt: now,
         updatedAt: now,
-
-        // ============================================================
-        // AUTHENTICATION - Password stored in Auth, not Firestore
-        // ============================================================
         hasPasswordSet: true,
         authUserId: authUid,
         passwordUpdatedAt: now,
@@ -565,10 +680,24 @@ export default function AddDriver() {
       console.error('❌ Error adding driver:', error);
 
       if (error.code === 'auth/email-already-in-use') {
-        toast.error('⚠️ This email is already registered. Please use a different email.', {
-          duration: 5000,
+        toast.error(`❌ ${formData.email} is already taken! Please use a different email.`, {
+          duration: 4000,
           icon: '🚫'
         });
+        setEmailAvailabilityMessage(`❌ ${formData.email} is already registered. Please use a different email.`);
+        setEmailError(true);
+        setAuthEmailExists(true);
+      } else if (error.code === 'auth/weak-password') {
+        toast.error('⚠️ Password too weak. Use at least 6 characters.', {
+          duration: 4000,
+          icon: '⚠️'
+        });
+      } else if (error.code === 'auth/network-request-failed' || error.message?.includes('network')) {
+        toast.error('🌐 Network error: Please check your internet connection and try again.', {
+          duration: 5000,
+          icon: '🌐'
+        });
+        setNetworkError(true);
       } else {
         toast.error('Failed to add driver: ' + (error.message || 'Unknown error'));
       }
@@ -603,6 +732,29 @@ export default function AddDriver() {
       default:
         return 'bg-white shadow-lg';
     }
+  };
+
+  // Check if form is valid for submission
+  const isFormValid = () => {
+    const hasRequiredFields =
+      formData.name.trim() !== '' &&
+      formData.email.trim() !== '' &&
+      formData.phone.trim() !== '' &&
+      formData.password.length >= 6 &&
+      formData.confirmPassword.length >= 6 &&
+      formData.password === formData.confirmPassword &&
+      !passwordError &&
+      !passwordMatchError &&
+      emailValidFormat &&
+      !emailError &&
+      !authEmailExists &&
+      !networkError &&
+      emailCheckComplete &&
+      !emailChecking &&
+      !loading &&
+      !uploadingPhoto;
+
+    return hasRequiredFields;
   };
 
   return (
@@ -731,13 +883,15 @@ export default function AddDriver() {
                     onChange={handleChange}
                   />
                   {emailChecking && (
-                    <p className="text-xs text-blue-500 mt-1">Checking email...</p>
+                    <p className="text-xs text-blue-500 mt-1">🔍 Checking email...</p>
                   )}
-                  {emailError && (
-                    <p className="text-xs text-red-500 mt-1">⚠️ This email is already used by another driver!</p>
+                  {networkError && (
+                    <p className="text-xs text-amber-500 mt-1">🌐 Network issue - Retrying...</p>
                   )}
-                  {authEmailExists && (
-                    <p className="text-xs text-red-500 mt-1">⚠️ This email is already registered in Firebase Auth!</p>
+                  {emailAvailabilityMessage && !emailChecking && (
+                    <p className={`text-xs mt-1 ${emailAvailabilityMessage.includes('❌') || emailAvailabilityMessage.includes('⚠️') ? 'text-red-500' : emailAvailabilityMessage.includes('✅') ? 'text-green-500' : 'text-blue-500'}`}>
+                      {emailAvailabilityMessage}
+                    </p>
                   )}
                 </div>
 
@@ -836,7 +990,7 @@ export default function AddDriver() {
                   {passwordError && (
                     <p className="text-xs text-red-500 mt-1">⚠️ Password must be at least 6 characters</p>
                   )}
-                  {!passwordError && formData.password && (
+                  {!passwordError && formData.password && formData.password.length >= 6 && (
                     <p className="text-xs text-green-500 mt-1">✅ Password strength: Good</p>
                   )}
                 </div>
@@ -986,7 +1140,7 @@ export default function AddDriver() {
             </div>
 
             {/* Info Box */}
-            <div className="p-4 rounded-lg bg-cyan-500 border border-blue-700 text-white">
+            <div className="p-4 rounded-lg bg-cyan-700 border border-blue-700 text-white">
               <p className="text-sm">
                 ℹ️ Driver will be created with:
                 <br />
@@ -999,6 +1153,8 @@ export default function AddDriver() {
                 • <strong>Important:</strong> Password must be at least 6 characters
                 <br />
                 • <strong>Email check:</strong> Both db and system Auth are checked for existing emails
+                <br />
+                • <strong>Status:</strong> {networkError ? '🌐 Network error - check connection' : emailError || authEmailExists ? '❌ Email unavailable - please use another one' : emailCheckComplete && formData.email && emailValidFormat ? '✅ Email available' : '⏳ Waiting for email check'}
               </p>
             </div>
 
@@ -1012,18 +1168,10 @@ export default function AddDriver() {
               </Link>
               <button
                 type="submit"
-                disabled={
-                  loading ||
-                  uploadingPhoto ||
-                  emailError ||
-                  emailChecking ||
-                  passwordError ||
-                  passwordMatchError ||
-                  !formData.password ||
-                  !formData.confirmPassword ||
-                  authEmailExists
-                }
-                className={`px-6 py-2 text-sm font-medium text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${emailError || passwordError || passwordMatchError || authEmailExists ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'
+                disabled={!isFormValid()}
+                className={`px-6 py-2 text-sm font-medium text-white rounded-lg transition ${isFormValid()
+                  ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
+                  : 'bg-gray-400 cursor-not-allowed opacity-50'
                   }`}
               >
                 {loading || uploadingPhoto ? (
@@ -1039,6 +1187,25 @@ export default function AddDriver() {
                 )}
               </button>
             </div>
+
+            {/* Form validation status */}
+            {!isFormValid() && (
+              <div className="text-xs text-amber-600 mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                ⚠️ Please fix the following before adding driver:
+                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                  {!formData.name && <li>Full Name is required</li>}
+                  {!formData.email && <li>Email is required</li>}
+                  {formData.email && !emailValidFormat && <li>Please enter a valid email address</li>}
+                  {(emailError || authEmailExists) && <li>❌ Email already taken - please use another one</li>}
+                  {networkError && <li>🌐 Network error - Please check your internet connection</li>}
+                  {!emailCheckComplete && formData.email && !emailError && !networkError && <li>Checking email availability...</li>}
+                  {!formData.phone && <li>Phone number is required</li>}
+                  {formData.password.length < 6 && <li>Password must be at least 6 characters</li>}
+                  {formData.password !== formData.confirmPassword && formData.confirmPassword && <li>Passwords do not match</li>}
+                  {!formData.confirmPassword && <li>Please confirm your password</li>}
+                </ul>
+              </div>
+            )}
           </form>
         </div>
       </div>

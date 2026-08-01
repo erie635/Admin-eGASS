@@ -385,7 +385,7 @@ export default function ImportFuel() {
             </div>
 
             {/* Info Box */}
-            <div className="p-4 rounded-lg bg-cyan-500 text-white border border-blue-700">
+            <div className="p-4 rounded-lg bg-cyan-700 text-white border border-blue-700">
               <p className="text-sm">
                 ℹ️ Imported fuel will be:
                 <br />

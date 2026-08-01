@@ -998,7 +998,7 @@ export default function DailyActivityPage() {
               placeholder="Search by driver name, ID or plate number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-200 border-gray-300"
+              className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-300 text-gray-900 border-gray-300"
             />
             <select
               value={sortBy}
@@ -1020,7 +1020,7 @@ export default function DailyActivityPage() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className={userBackground === 'dark' ? 'bg-gray-800' : 'bg-gray-600'}>
+              <thead className={userBackground === 'dark' ? 'bg-red-900' : 'bg-red-900'}>
                 <tr>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Driver</th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Driver ID</th>
@@ -1169,10 +1169,10 @@ export default function DailyActivityPage() {
 
         {/* Summary Footer */}
         <div className={`rounded-xl shadow-sm p-4 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 bg-cyan-500 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 bg-cyan-700 text-center">
             <div>
               <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Total Hours Worked</p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {totalHoursWorked}h {remainingMinutesWorked}m
               </p>
             </div>
@@ -1186,19 +1186,19 @@ export default function DailyActivityPage() {
             </div>
             <div>
               <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Average Working Time</p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {avgHours}h {avgMinutes}m
               </p>
             </div>
             <div>
               <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Total Sessions</p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {filteredActivities.reduce((sum, a) => sum + (a.onlineSessions || 0) + (a.offlineSessions || 0), 0)}
               </p>
             </div>
             <div>
               <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Last Sync</p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {lastSyncTime.toLocaleTimeString()}
               </p>
             </div>

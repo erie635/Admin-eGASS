@@ -147,7 +147,7 @@ export default function ComprehensiveReport() {
     }
   }, [driversData, fuelBreakdownSearchTerm]);
 
-  // Set up real-time listener
+  // Set up real-time listener with proper today's date filtering
   const setupDriversListener = () => {
     if (driversUnsubscribeRef.current) {
       console.log('🧹 Cleaning up existing listener...');
@@ -155,10 +155,10 @@ export default function ComprehensiveReport() {
       driversUnsubscribeRef.current = null;
     }
 
-    console.log(' Setting up real-time driver listener with useRef...');
+    console.log('🔄 Setting up real-time driver listener...');
 
     const unsubscribe = onSnapshot(collection(db, 'drivers'), (snapshot) => {
-      console.log(' Real-time update received! Drivers changed.');
+      console.log('📡 Real-time update received! Drivers changed.');
       
       const driversList = [];
       let totalStock = { Petrol: 0, Diesel: 0, Kerosene: 0, 'V-Power': 0 };
@@ -176,7 +176,8 @@ export default function ComprehensiveReport() {
           });
         }
 
-        if (data.salesHistory) {
+        if (data.salesHistory && Array.isArray(data.salesHistory)) {
+          console.log(`📊 Driver ${data.name} has ${data.salesHistory.length} sales`);
           data.salesHistory.forEach(sale => {
             allSales.push({
               ...sale,
@@ -186,6 +187,8 @@ export default function ComprehensiveReport() {
           });
         }
       });
+
+      console.log(`📊 Total sales found in all drivers: ${allSales.length}`);
 
       const totalCombinedLitres = Object.values(totalStock).reduce((sum, val) => sum + val, 0);
 
@@ -201,31 +204,50 @@ export default function ComprehensiveReport() {
       setSalesData(sortedSales);
       calculateStats(sortedSales);
       
+      // ALWAYS set to today's date for daily activity
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
       
-      const dateToFilter = selectedDate || todayStr;
-      filterDailyActivities(sortedSales, dateToFilter);
+      // Filter daily activities to ONLY show today's sales
+      const todaySales = sortedSales.filter(sale => {
+        const saleDate = new Date(sale.date);
+        const filterDate = new Date(todayStr);
+        return saleDate.toDateString() === filterDate.toDateString();
+      });
       
-      if (!selectedDate) {
-        setSelectedDate(todayStr);
-      }
+      console.log(`📅 Today's sales (${todayStr}): ${todaySales.length} activities found`);
       
+      setDailyActivities(todaySales);
+      setSelectedDate(todayStr);
+      setDailyLastUpdate(new Date());
+      
+      // If user has applied a date range filter, apply it
       if (showDailyFiltered && (dailyDateFrom || dailyDateTo)) {
         filterDailyActivitiesByDate(sortedSales);
       }
       
-      setDailyLastUpdate(new Date());
-
       fetchImports();
       setLoading(false);
       
       const onlineDrivers = driversList.filter(d => d.isOnline === true).length;
       const offlineDrivers = driversList.length - onlineDrivers;
       console.log(`🟢 Online drivers: ${onlineDrivers} | 🔴 Offline drivers: ${offlineDrivers} | Total: ${driversList.length}`);
-      console.log(` Total fuel with drivers: ${totalCombinedLitres}L (${Object.entries(totalStock).map(([k,v]) => `${k}: ${v}L`).join(', ')})`);
+      console.log(`⛽ Total fuel with drivers: ${totalCombinedLitres}L`);
       
-      toast.success(` Driver status updated: ${onlineDrivers} online, ${offlineDrivers} offline`, { duration: 2000 });
+      if (todaySales.length > 0) {
+        toast.success(`📊 ${todaySales.length} sales today, ${onlineDrivers} drivers online`, { duration: 2000 });
+      } else {
+        // Fix: Changed from toast.info() to toast() with custom styling
+        toast(`📊 No sales today, ${onlineDrivers} drivers online`, { 
+          duration: 2000,
+          icon: '📊',
+          style: {
+            borderRadius: '10px',
+            background: '#333',
+            color: '#fff',
+          },
+        });
+      }
       
     }, (error) => {
       console.error('❌ Error listening to drivers:', error);
@@ -277,7 +299,7 @@ export default function ComprehensiveReport() {
           });
         }
 
-        if (data.salesHistory) {
+        if (data.salesHistory && Array.isArray(data.salesHistory)) {
           data.salesHistory.forEach(sale => {
             allSales.push({
               ...sale,
@@ -287,6 +309,8 @@ export default function ComprehensiveReport() {
           });
         }
       });
+
+      console.log(`📊 Initial load: ${allSales.length} total sales found`);
 
       const totalCombinedLitres = Object.values(totalStock).reduce((sum, val) => sum + val, 0);
 
@@ -302,10 +326,22 @@ export default function ComprehensiveReport() {
       setTotalLitresWithDrivers(totalCombinedLitres);
       calculateStats(sortedSales);
       
+      // Set to today's date for daily activity
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
+      
+      // Filter to ONLY today's sales
+      const todaySales = sortedSales.filter(sale => {
+        const saleDate = new Date(sale.date);
+        const filterDate = new Date(todayStr);
+        return saleDate.toDateString() === filterDate.toDateString();
+      });
+      
+      console.log(`📅 Today's sales (${todayStr}): ${todaySales.length} activities found`);
+      
       setSelectedDate(todayStr);
-      filterDailyActivities(sortedSales, todayStr);
+      setDailyActivities(todaySales);
+      setDailyLastUpdate(new Date());
 
       await fetchImports();
 
@@ -461,10 +497,17 @@ export default function ComprehensiveReport() {
     setDailyDateTo('');
     setFilteredDailyActivities([]);
     setShowDailyFiltered(false);
-    if (selectedDate) {
-      filterDailyActivities(salesData, selectedDate);
-    }
-    toast('Daily filter cleared');
+    // Reset to today's sales
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    setSelectedDate(todayStr);
+    const todaySales = salesData.filter(sale => {
+      const saleDate = new Date(sale.date);
+      const filterDate = new Date(todayStr);
+      return saleDate.toDateString() === filterDate.toDateString();
+    });
+    setDailyActivities(todaySales);
+    toast('Showing today\'s sales');
   };
 
   function filterImportsByDate() {
@@ -600,7 +643,7 @@ export default function ComprehensiveReport() {
     }
   };
 
-  // ✅ FIXED: Calculate driver fuel metrics using fuelHistory for depot top-ups
+  // Calculate driver fuel metrics using fuelHistory for depot top-ups
   const calculateDriverMetrics = (driver) => {
     const remaining = driver.remainingFuel || {};
     const totalRemaining = Object.values(remaining).reduce((sum, val) => sum + (val || 0), 0);
@@ -612,56 +655,44 @@ export default function ComprehensiveReport() {
     const fuelHistory = driver.fuelHistory || [];
     const salesHistory = driver.salesHistory || [];
     
-    // ✅ FIX: Determine primary fuel type from fuelHistory first (most recent top-up)
-    let primaryFuelType = 'Petrol'; // Default to Petrol
+    // Determine primary fuel type from fuelHistory first (most recent top-up)
+    let primaryFuelType = 'Petrol';
     
     if (fuelHistory.length > 0) {
-      // Sort fuelHistory by timestamp (newest first)
       const sortedFuelHistoryForType = [...fuelHistory].sort((a, b) => {
         const dateA = new Date(a.timestamp);
         const dateB = new Date(b.timestamp);
         return dateB - dateA;
       });
       
-      // Get fuel type from the most recent fuel history entry
       const mostRecentFuel = sortedFuelHistoryForType[0];
       if (mostRecentFuel && mostRecentFuel.fuelType) {
         primaryFuelType = mostRecentFuel.fuelType;
       }
     } else if (fuelTypes.length > 0) {
-      // If no fuel history, use remaining fuel types
       primaryFuelType = fuelTypes[0];
     }
     
-    // ✅ ACCURATE: Sort fuelHistory by timestamp (newest first)
     const sortedFuelHistory = [...fuelHistory].sort((a, b) => {
       const dateA = new Date(a.timestamp);
       const dateB = new Date(b.timestamp);
       return dateB - dateA;
     });
     
-    // ✅ ACCURATE: Sort salesHistory by date (newest first)
     const sortedSalesHistory = [...salesHistory].sort((a, b) => {
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
       return dateB - dateA;
     });
     
-    // Total depot top-ups = number of fuelHistory entries
     const totalDepotTopUps = sortedFuelHistory.length;
-    
-    // Total litres added at depot = sum of all fuelHistory amounts
     const totalDepotLitresAdded = sortedFuelHistory.reduce((sum, entry) => sum + (entry.amount || 0), 0);
-    
-    // Total litres sold to customers = sum of all salesHistory
     const totalLitresSoldToCustomers = sortedSalesHistory.reduce((sum, sale) => sum + (sale.litresSold || 0), 0);
     
-    // ✅ CORRECT: Last Depot Top Up = most recent entry in fuelHistory
     const lastDepotTopUp = sortedFuelHistory.length > 0 ? sortedFuelHistory[0] : null;
     const lastDepotTopUpDate = lastDepotTopUp?.timestamp || null;
     const lastDepotTopUpLitres = lastDepotTopUp?.amount || 0;
     
-    // ✅ FIX: Use the fuel type from the top-up, fallback to Petrol
     const lastDepotTopUpFuelType = lastDepotTopUp?.fuelType || 'Petrol';
     const lastDepotTopUpAdmin = lastDepotTopUp?.adminName || 'Admin';
     const lastDepotTopUpNote = lastDepotTopUp?.note || '';
@@ -669,7 +700,6 @@ export default function ComprehensiveReport() {
     const mainTankBefore = lastDepotTopUp?.mainTankBefore || 0;
     const mainTankAfter = lastDepotTopUp?.mainTankAfter || 0;
     
-    // ✅ ACCURATE: Calculate sold since last depot top-up
     let soldSinceLastTopUp = 0;
     let salesSinceLastTopUp = [];
     let customersServedSinceTopUp = 0;
@@ -683,7 +713,6 @@ export default function ComprehensiveReport() {
       customersServedSinceTopUp = salesSinceLastTopUp.length;
     }
     
-    // ✅ ACCURATE: Calculate days since last depot top-up
     let daysSinceTopUp = 'N/A';
     let daysSinceTopUpNumber = 0;
     if (lastDepotTopUpDate) {
@@ -693,7 +722,6 @@ export default function ComprehensiveReport() {
       daysSinceTopUp = diffDays < 1 ? 'Today' : `${Math.floor(diffDays)}d ${Math.floor((diffDays % 1) * 24)}h`;
     }
     
-    // ✅ ACCURATE: Calculate average litres sold per day since last top-up
     let avgSoldPerDay = 0;
     if (lastDepotTopUpDate && soldSinceLastTopUp > 0 && daysSinceTopUpNumber > 0) {
       avgSoldPerDay = Math.round((soldSinceLastTopUp / daysSinceTopUpNumber) * 100) / 100;
@@ -701,17 +729,11 @@ export default function ComprehensiveReport() {
       avgSoldPerDay = soldSinceLastTopUp;
     }
     
-    // ✅ ACCURATE: Calculate current fuel remaining
     const currentFuelRemaining = totalRemaining;
-    
-    // ✅ ACCURATE: Fuel needed for refill
     const tankCapacity = driver.tankCapacity || 200;
     const fuelNeeded = Math.max(0, tankCapacity - currentFuelRemaining);
-    
-    // ✅ ACCURATE: Remaining percentage
     const remainingPercent = tankCapacity > 0 ? Math.round((currentFuelRemaining / tankCapacity) * 100) : 0;
     
-    // ✅ ACCURATE: Refill status based on remaining percentage
     let refillStatus = '🟢 Good';
     let refillStatusColor = 'text-green-600 bg-green-50 border-green-200';
     if (remainingPercent <= 10) {
@@ -725,24 +747,20 @@ export default function ComprehensiveReport() {
       refillStatusColor = 'text-yellow-600 bg-yellow-50 border-yellow-200';
     }
     
-    // Get last customer sale
     const lastCustomerSale = sortedSalesHistory.length > 0 ? sortedSalesHistory[0] : null;
     const lastSaleDate = lastCustomerSale?.date || null;
     const lastSaleLitres = lastCustomerSale?.litresSold || 0;
     const lastSaleFuelType = lastCustomerSale?.fuelType || '';
     const lastSaleAmount = lastCustomerSale?.totalAmount || 0;
     
-    // Status
     const isOnline = driver.isOnline === true;
     const status = isOnline ? 'Online' : 'Offline';
     
-    // ✅ ACCURATE: Build trip cycles from fuelHistory
     const tripCycles = [];
     sortedFuelHistory.forEach((topUp, index) => {
       const cycleStartDate = topUp.timestamp;
       const cycleStartLitres = topUp.amount;
       
-      // Find sales that occurred after this top-up and before the next top-up (if any)
       const nextTopUp = index > 0 ? sortedFuelHistory[index - 1] : null;
       const nextTopUpDate = nextTopUp?.timestamp || null;
       
@@ -760,7 +778,6 @@ export default function ComprehensiveReport() {
       const cycleLitresSold = cycleSales.reduce((sum, sale) => sum + (sale.litresSold || 0), 0);
       const cycleCustomersServed = cycleSales.length;
       
-      // Calculate cycle duration
       let cycleDuration = 'N/A';
       let cycleDurationDays = 0;
       if (nextTopUpDate) {
@@ -773,10 +790,7 @@ export default function ComprehensiveReport() {
         cycleDuration = cycleDurationDays < 1 ? 'Today' : `${Math.floor(cycleDurationDays)}d`;
       }
       
-      // Calculate cycle end fuel (remaining after sales)
       const cycleEndFuel = cycleStartLitres - cycleLitresSold;
-      
-      // Determine if cycle is complete (if there's a next top-up, it's complete)
       const isComplete = nextTopUp !== null;
       
       tripCycles.push({
@@ -795,13 +809,10 @@ export default function ComprehensiveReport() {
       });
     });
     
-    // Get the current active cycle
     const activeCycle = tripCycles.find(cycle => !cycle.isComplete) || (tripCycles.length > 0 ? tripCycles[0] : null);
     
-    // ✅ Build complete fuel movement history
     const combinedHistory = [];
     
-    // Add fuelHistory entries (depot top-ups)
     sortedFuelHistory.forEach(entry => {
       combinedHistory.push({
         date: entry.timestamp,
@@ -817,7 +828,6 @@ export default function ComprehensiveReport() {
       });
     });
     
-    // Add salesHistory entries (customer sales)
     sortedSalesHistory.forEach(sale => {
       combinedHistory.push({
         date: sale.date,
@@ -830,14 +840,12 @@ export default function ComprehensiveReport() {
       });
     });
     
-    // Sort by date (newest first)
     combinedHistory.sort((a, b) => {
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
       return dateB - dateA;
     });
     
-    // Calculate running balance from oldest to newest
     const sortedOldestToNewest = [...combinedHistory].sort((a, b) => {
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
@@ -854,7 +862,6 @@ export default function ComprehensiveReport() {
       entry.balanceAfter = Math.round(balance * 100) / 100;
     });
     
-    // Map back to original order
     const historyWithBalance = combinedHistory.map(entry => {
       const found = sortedOldestToNewest.find(e => 
         e.date === entry.date && 
@@ -881,7 +888,7 @@ export default function ComprehensiveReport() {
       lastDepotTopUp,
       lastDepotTopUpDate,
       lastDepotTopUpLitres,
-      lastDepotTopUpFuelType, // ✅ FIX: This now correctly uses the fuel type from the top-up
+      lastDepotTopUpFuelType,
       lastDepotTopUpAdmin,
       lastDepotTopUpNote,
       lastDepotTopUpSource,
@@ -937,7 +944,7 @@ export default function ComprehensiveReport() {
     <div className="space-y-6">
       <div
         className="rounded-xl shadow-lg p-6 border border-purple-200 hover:bg-purple-600 transition-all duration-300"
-        style={{ backgroundColor: '#780606' }}
+        style={{ backgroundColor: '#e93939' }}
       >
         <p className="text-sm font-semibold uppercase tracking-wider text-purple-100">Total Revenue</p>
         <p className="text-3xl font-bold text-white mt-1">KES {totalStats.revenue.toLocaleString()}</p>
@@ -1000,7 +1007,7 @@ export default function ComprehensiveReport() {
           <p className="text-sm mt-1 text-gray-500">Select a specific date range to view detailed transactions</p>
         </div>
 
-        <div className="p-6 bg-cyan-500">
+        <div className="p-6 bg-cyan-700">
           <div className="flex flex-wrap items-end gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-900 mb-1">Date From</label>
@@ -1064,13 +1071,13 @@ export default function ComprehensiveReport() {
 
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-red-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Driver</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Fuel</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Litres</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-200">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-200">Driver</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-200">Fuel</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-200">Litres</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-200">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -1106,7 +1113,17 @@ export default function ComprehensiveReport() {
   const renderDailyActivityContent = () => {
     const today = new Date().toISOString().split('T')[0];
     const displayDate = selectedDate || today;
-    const activitiesToShow = showDailyFiltered ? filteredDailyActivities : dailyActivities;
+    
+    // Determine which activities to show
+    let activitiesToShow = [];
+    
+    if (showDailyFiltered) {
+      // Show filtered by date range
+      activitiesToShow = filteredDailyActivities;
+    } else {
+      // Show today's activities (dailyActivities is already filtered to today)
+      activitiesToShow = dailyActivities;
+    }
 
     return (
       <div className="rounded-xl shadow-sm border border-gray-200 bg-white p-6">
@@ -1123,6 +1140,11 @@ export default function ComprehensiveReport() {
                   Updated: {dailyLastUpdate.toLocaleTimeString()}
                 </span>
               )}
+              {!showDailyFiltered && selectedDate === today && (
+                <span className="text-xs text-blue-600 font-medium ml-2 bg-blue-50 px-2 py-0.5 rounded-full">
+                  📅 Today's Sales
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -1133,7 +1155,7 @@ export default function ComprehensiveReport() {
           </button>
         </div>
 
-        <div className="p-4 rounded-lg mb-6 bg-cyan-500">
+        <div className="p-4 rounded-lg mb-6 bg-cyan-700">
           <div className="flex flex-wrap items-end gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-900 mb-1">Date From</label>
@@ -1170,7 +1192,7 @@ export default function ComprehensiveReport() {
             )}
           </div>
           <div className="mt-3 flex items-center gap-3">
-            <span className="text-sm text-blue-700">Or select single date:</span>
+            <span className="text-sm text-cyan-200">Or select single date:</span>
             <input
               type="date"
               value={displayDate}
@@ -1178,7 +1200,7 @@ export default function ComprehensiveReport() {
               className="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-red-900 bg-white border-gray-300"
             />
             {!showDailyFiltered && (
-              <span className="text-xs text-gray-600 ml-2">
+              <span className="text-xs text-cyan-400 ml-2">
                 ({activitiesToShow.length} activities)
               </span>
             )}
@@ -1207,7 +1229,7 @@ export default function ComprehensiveReport() {
         {activitiesToShow.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-600">
+              <thead className="bg-red-900">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-100">Driver</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-100">Fuel Type</th>
@@ -1233,7 +1255,7 @@ export default function ComprehensiveReport() {
           </div>
         ) : (
           <div className="p-8 text-center rounded-lg bg-gray-50">
-            <p className="text-lg text-gray-500">No activities found</p>
+            <p className="text-lg text-gray-500">No activities found for today</p>
             <p className="text-sm mt-1 text-gray-400">
               {showDailyFiltered ? 'No activities in the selected date range' : 'Select a date to view activities'}
             </p>
@@ -1290,7 +1312,7 @@ export default function ComprehensiveReport() {
           </button>
         </div>
 
-        <div className="p-4 rounded-lg mb-6 bg-cyan-500">
+        <div className="p-4 rounded-lg mb-6 bg-cyan-700">
           <div className="flex flex-wrap items-end gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-900 mb-1">Date From</label>
@@ -1345,7 +1367,7 @@ export default function ComprehensiveReport() {
         {importsToShow.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-600">
+              <thead className="bg-red-900">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-100">Date</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-100">Fuel Type</th>
@@ -1388,19 +1410,17 @@ export default function ComprehensiveReport() {
     );
   };
 
-  // ✅ ENHANCED: Company Stock with accurate depot top-up tracking and trip cycles
+  // Company Stock with accurate depot top-up tracking and trip cycles
   const renderCompanyStockContent = () => {
     const stockItems = Object.entries(fuelStockData);
     const totalFuel = totalLitresWithDrivers;
     const driversToShow = filteredFuelBreakdown;
     
-    // Calculate business summary metrics
     const totalDrivers = driversData.length;
     const totalFuelWithDrivers = totalFuel;
     const totalFuelSold = salesData.reduce((sum, sale) => sum + (sale.litresSold || 0), 0);
     const totalFuelEverIssued = totalFuelSold + totalFuelWithDrivers;
     
-    // Calculate fuel required for complete refill
     let totalFuelRequired = 0;
     driversData.forEach(driver => {
       const remaining = driver.remainingFuel || {};
@@ -1434,7 +1454,6 @@ export default function ComprehensiveReport() {
           </button>
         </div>
 
-        {/* Business Summary Card */}
         <div className="rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 p-6 mb-6 shadow-xl">
           <div className="text-white">
             <div className="flex items-center justify-between mb-4">
@@ -1477,8 +1496,7 @@ export default function ComprehensiveReport() {
           </div>
         </div>
 
-        {/* Total fuel with all drivers combined */}
-        <div className="p-4 rounded-xl mb-6 bg-gradient-to-r from-blue-500 to-blue-600 shadow-md">
+        <div className="p-4 rounded-xl mb-6 bg-gradient-to-r from-red-400 to-yellow-700 shadow-md">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-blue-100"> Total Fuel with All Drivers</p>
@@ -1493,7 +1511,6 @@ export default function ComprehensiveReport() {
           </div>
         </div>
 
-        {/* Per fuel type breakdown */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {stockItems.length > 0 ? (
             stockItems.map(([fuelType, quantity]) => {
@@ -1530,7 +1547,6 @@ export default function ComprehensiveReport() {
           )}
         </div>
 
-        {/* Individual driver fuel breakdown - ✅ FIXED: Using lastDepotTopUpFuelType */}
         {driversData.length > 0 && (
           <div className="mt-6">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -1566,8 +1582,8 @@ export default function ComprehensiveReport() {
               <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
                 <table className="w-full text-sm min-w-[1800px]">
                   <thead>
-                    <tr className="bg-gradient-to-r from-gray-700 to-gray-800">
-                      <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-200 sticky left-0 bg-gray-800 z-10 min-w-[120px]">Driver</th>
+                    <tr className="bg-gradient-to-r from-red-900 to-yellow-800">
+                      <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-200 sticky left-0 bg-gray-600 z-10 min-w-[120px]">Driver</th>
                       <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-200 min-w-[110px]">Phone</th>
                       <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-200 min-w-[90px]">Fuel Type</th>
                       <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-200 min-w-[140px]">Last Depot Top Up</th>
@@ -1602,8 +1618,6 @@ export default function ComprehensiveReport() {
                       
                       const topUpAdmin = metrics.lastDepotTopUpAdmin || 'N/A';
                       const topUpNote = metrics.lastDepotTopUpNote || '';
-                      
-                      // ✅ FIXED: Use lastDepotTopUpFuelType instead of primaryFuelType
                       const displayFuelType = metrics.lastDepotTopUpFuelType || 'Petrol';
                       
                       return (
@@ -1626,7 +1640,6 @@ export default function ComprehensiveReport() {
                           </td>
                           <td className="px-4 py-3.5 text-sm text-gray-600">{driver.phone || 'N/A'}</td>
                           <td className="px-4 py-3.5 text-sm">
-                            {/* ✅ FIXED: Use displayFuelType from last top-up */}
                             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                               displayFuelType === 'Petrol' ? 'bg-yellow-100 text-yellow-700' :
                               displayFuelType === 'Diesel' ? 'bg-green-100 text-green-700' :
@@ -1696,7 +1709,6 @@ export default function ComprehensiveReport() {
                         </tr>
                       );
                     })}
-                    {/* Totals row */}
                     <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 font-semibold border-t-2 border-blue-200">
                       <td className="px-4 py-4 text-sm text-gray-800 sticky left-0 bg-inherit z-10">
                         <span className="text-blue-600"> TOTAL</span>
@@ -1735,7 +1747,6 @@ export default function ComprehensiveReport() {
           </div>
         )}
 
-        {/* Trip Cycle Summary Modal */}
         {showDriverHistory && selectedDriverId && (
           <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -1766,7 +1777,6 @@ export default function ComprehensiveReport() {
               <div className="p-6 overflow-y-auto max-h-[60vh]">
                 {selectedDriverHistory.length > 0 ? (
                   <div className="space-y-6">
-                    {/* Trip Cycle Summary */}
                     <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-200">
                       <h4 className="text-sm font-semibold text-indigo-700 mb-3 flex items-center gap-2">
                         <span className="text-lg"></span> Trip Cycle Summary
@@ -1800,17 +1810,16 @@ export default function ComprehensiveReport() {
                       </div>
                     </div>
 
-                    {/* Transaction History */}
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="bg-gray-100">
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Date & Time</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Activity</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Fuel Type</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Litres</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Balance After</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Details</th>
+                          <tr className="bg-red-900">
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-200">Date & Time</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-200">Activity</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-200">Fuel Type</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-200">Litres</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-200">Balance After</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-200">Details</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -1998,7 +2007,7 @@ export default function ComprehensiveReport() {
         {driversToShow.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-600">
+              <thead className="bg-red-900">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-200">Driver Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-200">Phone</th>
@@ -2111,7 +2120,6 @@ export default function ComprehensiveReport() {
     <div className="min-h-screen p-4 md:p-6 bg-gray-100">
       <div className="max-w-7xl mx-auto">
         <div className="space-y-6">
-          {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-2xl font-bold"> Comprehensive Report</h1>
@@ -2123,7 +2131,6 @@ export default function ComprehensiveReport() {
             </Link>
           </div>
 
-          {/* Section Navigation Tabs */}
           <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2">
             {sections.map((section) => (
               <button
@@ -2140,7 +2147,6 @@ export default function ComprehensiveReport() {
             ))}
           </div>
 
-          {/* Dynamic Content */}
           {renderContent()}
         </div>
       </div>

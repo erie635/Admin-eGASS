@@ -22,6 +22,7 @@ const menuCategories = [
     name: "Customer Care",
     items: [
       { name: "Sales Report", href: "/reports/sales" },
+      { name: "Client Feedback", href: "/dashboard/feedback" }, // ✅ Added Feedback link
     ],
   },
   {
@@ -57,6 +58,7 @@ const menuCategories = [
 const ALLOWED_PATHS: string[] = [
   "/dashboard",
   "/reports/sales",
+  "/dashboard/feedback", // ✅ Added feedback path
   "/fuel/tanks",
   "/drivers",
   "/drivers/add",

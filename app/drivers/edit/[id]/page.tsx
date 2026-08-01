@@ -9,6 +9,91 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { createUserWithEmailAndPassword, updatePassword, signInWithEmailAndPassword, getAuth, updateProfile, deleteUser, sendPasswordResetEmail } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
+// ✅ Star Rating Component - Enhanced for better visibility with accessibility
+const StarRating = ({ rating, size = 'sm', showLabel = true, userBackground = 'white' }: { rating: number; size?: 'sm' | 'md' | 'lg'; showLabel?: boolean; userBackground?: string }) => {
+  // Ensure rating is a valid number between 0 and 5
+  const validRating = Math.max(0, Math.min(5, rating || 0));
+  
+  // Calculate stars with refined half-star logic
+  const fullStars = Math.floor(validRating);
+  const decimal = validRating - fullStars;
+  // Show half star for decimals >= 0.25 and < 0.75 for better precision
+  const hasHalfStar = decimal >= 0.25 && decimal < 0.75;
+  // Show full star for decimals >= 0.75 (round up)
+  const roundedFullStars = decimal >= 0.75 ? fullStars + 1 : fullStars;
+  const finalFullStars = Math.min(roundedFullStars, 5);
+  const finalHasHalfStar = hasHalfStar && finalFullStars < 5;
+  const emptyStars = 5 - finalFullStars - (finalHasHalfStar ? 1 : 0);
+
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6'
+  };
+
+  const starClass = sizeClasses[size] || sizeClasses.sm;
+
+  // Accessibility: Generate aria-label for screen readers
+  const getAriaLabel = () => {
+    if (validRating === 0) return '0 out of 5 stars';
+    if (validRating === 1) return '1 out of 5 stars';
+    if (validRating === 5) return '5 out of 5 stars';
+    return `${validRating.toFixed(1)} out of 5 stars`;
+  };
+
+  return (
+    <div className="flex items-center space-x-1" role="img" aria-label={getAriaLabel()}>
+      {/* Full Stars - Gold/Yellow */}
+      {[...Array(Math.max(0, finalFullStars))].map((_, i) => (
+        <svg 
+          key={`full_${i}`} 
+          className={`${starClass} text-yellow-400 drop-shadow-sm`} 
+          fill="currentColor" 
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+          role="presentation"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.18c.969 0 1.371 1.24.588 1.81l-3.39 2.462a1 1 0 00-.364 1.118l1.287 3.974c.3.922-.755 1.688-1.54 1.118l-3.39-2.462a1 1 0 00-1.175 0l-3.39 2.462c-.784.57-1.838-.196-1.539-1.118l1.286-3.974a1 1 0 00-.364-1.118L2.045 9.4c-.783-.57-.38-1.81.588-1.81h4.18a1 1 0 00.95-.69l1.286-3.974z"/>
+        </svg>
+      ))}
+
+      {/* Half Star - Gold/Yellow */}
+      {finalHasHalfStar && (
+        <svg 
+          className={`${starClass} text-yellow-400 drop-shadow-sm`} 
+          fill="currentColor" 
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+          role="presentation"
+        >
+          <path d="M10 15.27l5.18 3.05-1.64-5.81L19 8.5l-6.91-.59L10 2 7.91 7.91 1 8.5l4.45 3.98-1.64 5.81L10 15.27z"/>
+        </svg>
+      )}
+
+      {/* Empty Stars - Gray */}
+      {[...Array(Math.max(0, emptyStars))].map((_, i) => (
+        <svg 
+          key={`empty_${i}`} 
+          className={`${starClass} text-gray-300 drop-shadow-sm`} 
+          fill="currentColor" 
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+          role="presentation"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.974a1 1 0 00.95.69h4.18c.969 0 1.371 1.24.588 1.81l-3.39 2.462a1 1 0 00-.364 1.118l1.287 3.974c.3.922-.755 1.688-1.54 1.118l-3.39-2.462a1 1 0 00-1.175 0l-3.39 2.462c-.784.57-1.838-.196-1.539-1.118l1.286-3.974a1 1 0 00-.364-1.118L2.045 9.4c-.783-.57-.38-1.81.588-1.81h4.18a1 1 0 00.95-.69l1.286-3.974z"/>
+        </svg>
+      ))}
+
+      {/* Rating Label */}
+      {showLabel && (
+        <span className={`ml-2 text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+          ({validRating.toFixed(1)})
+        </span>
+      )}
+    </div>
+  );
+};
+
 interface DriverData {
   id: string;
   userId?: string;
@@ -359,7 +444,7 @@ export default function EditDriver() {
           heading: data.heading ?? prev.heading,
           completedOrders: data.completedOrders ?? prev.completedOrders,
           totalRevenueToday: data.totalRevenueToday ?? prev.totalRevenueToday,
-          rating: data.rating ?? prev.rating,
+          rating: data.rating ?? prev.rating, // ✅ Rating updates live
           isApproved: data.isApproved ?? prev.isApproved,
         };
       });
@@ -616,7 +701,6 @@ export default function EditDriver() {
     }
   };
 
-  // ✅ FIXED: handleFuelTopUp with correct adminName from logged-in user
   const handleFuelTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fuelData.fuelType || fuelData.amount <= 0) {
@@ -635,21 +719,18 @@ export default function EditDriver() {
       const companyRef = doc(db, 'company', 'fuelStock');
       const driverRef = doc(db, 'drivers', driverId);
 
-      // ✅ Get the current logged-in user for admin name
       const currentUser = auth.currentUser;
       let adminName = 'Admin';
       let adminId = 'admin';
       
       if (currentUser) {
         adminId = currentUser.uid;
-        // Try to get display name, fallback to email or 'Admin'
         if (currentUser.displayName) {
           adminName = currentUser.displayName;
         } else if (currentUser.email) {
           adminName = currentUser.email.split('@')[0];
         }
         
-        // Try to get full name from users collection
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
           if (userDoc.exists()) {
@@ -694,7 +775,6 @@ export default function EditDriver() {
           throw new Error(`INSUFFICIENT_FUEL:${mainTankAmount}:${amount}`);
         }
 
-        // ✅ FIXED: Use the adminName from logged-in user, NOT the driver's name
         const newHistoryEntry = {
           fuelType: fuelType,
           amount: amount,
@@ -703,14 +783,13 @@ export default function EditDriver() {
           note: fuelData.note || 'Admin top-up from main tank',
           timestamp: new Date().toISOString(),
           adminId: adminId,
-          adminName: adminName,  // ✅ This is the logged-in admin's name
+          adminName: adminName,
           action: 'top-up',
           source: 'main-tank',
           mainTankBefore: mainTankAmount,
           mainTankAfter: newMainStock
         };
 
-        // ✅ FIXED: Also ensure company log uses the correct admin name
         const companyLogEntry = {
           fuelType: fuelType,
           amount: amount,
@@ -721,7 +800,7 @@ export default function EditDriver() {
           date: new Date().toLocaleString(),
           previousTankAmount: mainTankAmount,
           newTankAmount: newMainStock,
-          updatedBy: adminName,  // ✅ Use adminName, not driver name
+          updatedBy: adminName,
           driverId: driverId,
           driverName: driverData.name || 'Unknown Driver',
           capacityInfo: `${newMainStock}/100000L`
@@ -1412,7 +1491,7 @@ export default function EditDriver() {
                           if (parent) {
                             const fallback = document.createElement('div');
                             fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
-                            fallback.innerHTML = `<span class="text-4xl text-gray-400">${driver.name?.charAt(0)?.toUpperCase() || '?'}</span>`;
+                            fallback.innerHTML = `<span className="text-4xl text-gray-400">${driver.name?.charAt(0)?.toUpperCase() || '?'}</span>`;
                             parent.appendChild(fallback);
                           }
                           setIsPhotoLoading(false);
@@ -1521,11 +1600,37 @@ export default function EditDriver() {
                   </div>
                   <div>
                     <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Rating</p>
-                    <p className={`text-lg font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{driver.rating || 0} ⭐</p>
+                    {/* ✅ Star Rating Display - Live Updates */}
+                    <div className="flex items-center space-x-2">
+                      <StarRating rating={driver.rating || 0} size="sm" showLabel={false} userBackground={userBackground} />
+                      <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {driver.rating?.toFixed(1) || '0.0'}
+                      </span>
+                    </div>
                   </div>
                   <div>
                     <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Driver ID</p>
                     <p className={`text-sm font-mono ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>{driver.id.slice(0, 12)}...</p>
+                  </div>
+                </div>
+                
+                {/* ✅ Large Star Rating Display with Reviews Count */}
+                <div className="mt-4 pt-4 border-t ${userBackground === 'dark' ? 'border-gray-600' : 'border-gray-200'}">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div>
+                        <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Driver Rating</p>
+                        <StarRating rating={driver.rating || 0} size="md" showLabel={true} userBackground={userBackground} />
+                      </div>
+                      <div className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Based on {driver.completedOrders || 0} completed orders
+                      </div>
+                    </div>
+                    <div className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} flex items-center space-x-1`}>
+                      <span className="text-yellow-400">★</span>
+                      <span className="font-medium">{driver.rating?.toFixed(1) || '0.0'}</span>
+                      <span>({driver.completedOrders || 0})</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1577,6 +1682,8 @@ export default function EditDriver() {
                     <div className="flex items-center space-x-2 mt-1">
                       <span className={`w-2 h-2 rounded-full ${formData.isOnline ? 'bg-green-500' : 'bg-red-500'}`}></span>
                       <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>{formData.isOnline ? '🟢 Available' : '🔴 Offline'}</span>
+                      {/* ✅ Show star rating in preview */}
+                      <StarRating rating={driver.rating || 0} size="sm" showLabel={false} userBackground={userBackground} />
                     </div>
                   </div>
                 </div>

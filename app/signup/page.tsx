@@ -7,6 +7,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import Image from 'next/image';
 
 interface FormData {
   name: string;
@@ -163,8 +164,15 @@ export default function Signup() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4">
         <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md text-center">
-          <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center mx-auto mb-6">
-            <img src="/images/logo.png" alt="Logo" className="w-20 h-20 object-contain" />
+          <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center mx-auto mb-6 relative">
+            <Image 
+              src="/images/logo.png" 
+              alt="Logo" 
+              width={80}
+              height={80}
+              className="object-contain"
+              priority
+            />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">✅ Account Created!</h2>
           <p className="text-gray-600 mb-4">Your account has been created successfully.</p>
@@ -185,8 +193,15 @@ export default function Signup() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
-            <img src="/images/logo.png" alt="Logo" className="w-25 h-25 object-contain" />
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4 relative">
+            <Image 
+              src="/images/logo.png" 
+              alt="Logo" 
+              width={96}
+              height={96}
+              className="object-contain p-2"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">Create Account</h1>
           <p className="text-gray-500 text-sm mt-2">Create your account to get started</p>

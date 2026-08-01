@@ -136,22 +136,22 @@ export default function CompanyFuelStock() {
         </div>
 
        {/* Overall Stock Status */}
-<div className={`rounded-xl shadow-lg p-6 border ${userBackground === 'dark' ? 'bg-blue-800' : 'bg-gradient-to-br from-blue-50 to-cyan-900 border-blue-200'} hover:shadow-xl transition-all duration-300`}>
+<div className={`rounded-xl shadow-lg p-6 border ${userBackground === 'dark' ? 'bg-blue-800' : 'bg-gradient-to-br from-blue-800 to-cyan-900 border-blue-200'} hover:shadow-xl transition-all duration-300`}>
   {/* CHANGE 1: Added gradient backgrounds (to-br from-blue to-cyan) for depth, hover shadow, and transition */}
   
   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
     <div>
-      <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-red-900'}`}> Total Fuel Stock</h2>
+      <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-red-600'}`}> Total Fuel Stock</h2>
       <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-900'}`}>Total Capacity: {totalCapacity.toLocaleString()} Liters</p>
       {/* CHANGE 2: Dark mode text color from 'text-gray-400' to 'text-gray-300' for better contrast */}
     </div>
     <div className="flex items-center space-x-4">
-      <span className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+      <span className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-400'}`}>
         {/* CHANGE 3: Text size from 'text-2xl' to 'text-3xl' for better visibility */}
         {/* CHANGE 4: Dark mode text color from 'text-blue-400' to 'text-blue-300' for better contrast */}
         {total.toFixed(1)}L
       </span>
-      <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-red-800'}`}>
+      <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-red-600'}`}>
         / {totalCapacity.toLocaleString()}L
       </span>
       <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${
@@ -212,7 +212,7 @@ export default function CompanyFuelStock() {
 
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className={userBackground === 'dark' ? 'bg-gray-800' : 'bg-gray-600'}>
+              <thead className={userBackground === 'dark' ? 'bg-red-900' : 'bg-red-900'}>
                 <tr>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Fuel Type</th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Current Stock (L)</th>
@@ -280,13 +280,13 @@ export default function CompanyFuelStock() {
         </div>
 
         {/* Info Section */}
-        <div className={`p-4 rounded-lg border ${userBackground === 'dark' ? 'bg-cyan-500/30 border-cyan-700 text-cyan-200' : 'bg-cyan-500 border-cyan-200 text-cyan-700'}`}>
+        <div className={`p-4 rounded-lg border ${userBackground === 'dark' ? 'bg-cyan-500/30 border-cyan-700 text-cyan-200' : 'bg-cyan-700 border-cyan-200 text-cyan-700'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center space-x-4">
               <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-100' : 'text-gray-200'}`}>ℹ️ Information:</span>
-              <span className={`text-sm ${userBackground === 'dark' ? 'text-cyan-300' : 'text-red-900'}`}>Fuel levels are automatically managed through imports</span>
+              <span className={`text-sm ${userBackground === 'dark' ? 'text-cyan-300' : 'text-cyan-300'}`}>Fuel levels are automatically managed through imports</span>
             </div>
-            <div className={`text-sm ${userBackground === 'dark' ? 'text-cyan-300' : 'text-red-900'}`}>
+            <div className={`text-sm ${userBackground === 'dark' ? 'text-cyan-300' : 'text-cyan-300'}`}>
               💡 Fuel is added only via the Import Fuel page
             </div>
           </div>

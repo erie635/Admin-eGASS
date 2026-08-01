@@ -1,8 +1,22 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['firebasestorage.googleapis.com'],
+    // Replace the deprecated 'domains' with 'remotePatterns'
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+  },
+  // Add this to fix the multiple lockfiles warning
+  turbopack: {
+    root: path.join(__dirname),
   },
 };
 

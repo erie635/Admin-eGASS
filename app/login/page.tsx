@@ -10,6 +10,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import Image from 'next/image';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -149,8 +150,15 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
-            <img src="/images/logo.png" alt="Logo" className="w-25 h-25 object-contain" />
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4 relative">
+            <Image 
+              src="/images/logo.png" 
+              alt="Logo" 
+              width={96}
+              height={96}
+              className="object-contain p-2"
+              priority
+            />
           </div>
 
           <h1 className="text-2xl font-bold text-gray-800">

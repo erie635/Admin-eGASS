@@ -153,6 +153,8 @@ interface DriverData {
   offlineHistory?: any[];
   lastOnlineTime?: string | null;
   lastOfflineTime?: string | null;
+  totalFeedbacks?: number;
+  totalRatingPoints?: number;
 }
 
 export default function EditDriver() {
@@ -211,6 +213,235 @@ export default function EditDriver() {
     pricePerKm: 0,
     userType: 'driver'
   });
+
+  // ✅ Sentiment Analysis - Positive, Negative, Moderate word lists
+  const positiveWords = [
+    'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic', 'awesome', 'perfect',
+    'best', 'nice', 'kind', 'helpful', 'professional', 'reliable', 'trustworthy', 'honest',
+    'hardworking', 'dedicated', 'efficient', 'fast', 'quick', 'punctual', 'on time',
+    'recommend', 'love', 'happy', 'satisfied', 'impressed', 'outstanding', 'brilliant',
+    'friendly', 'courteous', 'polite', 'respectful', 'careful', 'safe', 'clean', 'tidy',
+    'expert', 'skilled', 'knowledgeable', 'experienced', 'patient', 'understanding',
+    'responsive', 'communicative', 'attentive', 'thorough', 'meticulous', 'superb',
+    'top notch', 'first class', 'highly recommend', 'very good', 'very nice'
+  ];
+
+  const negativeWords = [
+    'bad', 'poor', 'terrible', 'awful', 'horrible', 'worst', 'disappointing', 'disappointed',
+    'rude', 'unprofessional', 'unreliable', 'dishonest', 'lazy', 'slow', 'late', 'tardy',
+    'careless', 'dangerous', 'reckless', 'abusive', 'insulting', 'offensive', 'aggressive',
+    'impatient', 'arrogant', 'incompetent', 'inexperienced', 'unhelpful', 'ignorant',
+    'unresponsive', 'inattentive', 'messy', 'dirty', 'unsafe', 'scam', 'fraud', 'cheat',
+    'overcharged', 'damaged', 'broken', 'terrible experience', 'waste of time', 'never again',
+    'avoid', 'worst experience', 'very bad', 'not good', 'poor service'
+  ];
+
+  const moderateWords = [
+    'okay', 'fine', 'average', 'decent', 'fair', 'mediocre', 'satisfactory', 'acceptable',
+    'not bad', 'so so', 'alright', 'moderate', 'reasonable', 'passable', 'tolerable',
+    'middle', 'standard', 'ordinary', 'common', 'usual', 'regular', 'typical',
+    'normal', 'expected', 'reasonable'
+  ];
+
+  // ✅ Sentiment analysis function
+  const analyzeSentiment = useCallback((comment: string): { sentiment: 'positive' | 'negative' | 'moderate' | 'neutral'; score: number } => {
+    if (!comment || comment.trim().length === 0) {
+      return { sentiment: 'neutral', score: 0 };
+    }
+
+    const lowerComment = comment.toLowerCase();
+    let positiveScore = 0;
+    let negativeScore = 0;
+    let moderateScore = 0;
+
+    // Check for positive words
+    positiveWords.forEach(word => {
+      if (lowerComment.includes(word)) {
+        positiveScore += 1;
+      }
+    });
+
+    // Check for negative words
+    negativeWords.forEach(word => {
+      if (lowerComment.includes(word)) {
+        negativeScore += 1;
+      }
+    });
+
+    // Check for moderate words
+    moderateWords.forEach(word => {
+      if (lowerComment.includes(word)) {
+        moderateScore += 0.5;
+      }
+    });
+
+    // Calculate total sentiment score
+    const totalScore = positiveScore - negativeScore + (moderateScore * 0.3);
+    
+    if (totalScore > 1) {
+      return { sentiment: 'positive', score: totalScore };
+    } else if (totalScore < -1) {
+      return { sentiment: 'negative', score: totalScore };
+    } else if (totalScore >= -1 && totalScore <= 1 && moderateScore > 0) {
+      return { sentiment: 'moderate', score: totalScore };
+    } else {
+      return { sentiment: 'neutral', score: 0 };
+    }
+  }, []);
+
+  // ✅ Calculate driver rating based on feedback with sentiment analysis
+  const calculateDriverRating = useCallback(async (driverId: string) => {
+    try {
+      // Get all feedback for this driver
+      const feedbackQuery = query(
+        collection(db, 'feedback'),
+        where('driverId', '==', driverId)
+      );
+      const feedbackSnapshot = await getDocs(feedbackQuery);
+      
+      const feedbacks = feedbackSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          rating: data.rating || 0,
+          comment: data.comment || ''
+        };
+      });
+      
+      const totalFeedbacks = feedbacks.length;
+      
+      if (totalFeedbacks === 0) {
+        return { rating: 0, totalFeedbacks: 0, totalRatingPoints: 0, sentimentBreakdown: { positive: 0, negative: 0, moderate: 0, neutral: 0 } };
+      }
+      
+      // Calculate rating from stars
+      const totalRatingPoints = feedbacks.reduce((sum, f) => sum + (f.rating || 0), 0);
+      const averageRating = totalRatingPoints / totalFeedbacks;
+      
+      // ✅ Analyze sentiment for each feedback and adjust rating
+      let adjustedRating = averageRating;
+      let sentimentBreakdown = { positive: 0, negative: 0, moderate: 0, neutral: 0 };
+      
+      feedbacks.forEach(feedback => {
+        const sentiment = analyzeSentiment(feedback.comment);
+        
+        if (sentiment.sentiment === 'positive') {
+          sentimentBreakdown.positive++;
+          // If comment is positive but rating is low, boost rating slightly
+          if (feedback.rating < 3) {
+            adjustedRating += 0.5;
+          }
+        } else if (sentiment.sentiment === 'negative') {
+          sentimentBreakdown.negative++;
+          // If comment is negative but rating is high, reduce rating slightly
+          if (feedback.rating > 3) {
+            adjustedRating -= 0.5;
+          }
+        } else if (sentiment.sentiment === 'moderate') {
+          sentimentBreakdown.moderate++;
+          // Moderate comments - keep rating as is
+        } else {
+          sentimentBreakdown.neutral++;
+        }
+      });
+      
+      // Ensure rating stays within 0-5 range
+      adjustedRating = Math.max(0, Math.min(5, adjustedRating));
+      
+      // Round to 1 decimal place
+      const finalRating = Math.round(adjustedRating * 10) / 10;
+      
+      return {
+        rating: finalRating,
+        totalFeedbacks: totalFeedbacks,
+        totalRatingPoints: totalRatingPoints,
+        sentimentBreakdown: sentimentBreakdown,
+        averageRating: averageRating,
+        adjustedRating: adjustedRating
+      };
+    } catch (error) {
+      console.error('Error calculating driver rating:', error);
+      return null;
+    }
+  }, [analyzeSentiment]);
+
+  // ✅ Update driver rating in Firestore with sentiment analysis
+  const updateDriverRating = useCallback(async (driverId: string) => {
+    try {
+      const ratingData = await calculateDriverRating(driverId);
+      if (!ratingData) return;
+      
+      const driverRef = doc(db, 'drivers', driverId);
+      await updateDoc(driverRef, {
+        rating: ratingData.rating,
+        totalFeedbacks: ratingData.totalFeedbacks,
+        totalRatingPoints: ratingData.totalRatingPoints,
+        sentimentPositive: ratingData.sentimentBreakdown.positive,
+        sentimentNegative: ratingData.sentimentBreakdown.negative,
+        sentimentModerate: ratingData.sentimentBreakdown.moderate,
+        sentimentNeutral: ratingData.sentimentBreakdown.neutral,
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Update local driver state
+      setDriver(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          rating: ratingData.rating,
+          totalFeedbacks: ratingData.totalFeedbacks,
+          totalRatingPoints: ratingData.totalRatingPoints,
+          sentimentPositive: ratingData.sentimentBreakdown.positive,
+          sentimentNegative: ratingData.sentimentBreakdown.negative,
+          sentimentModerate: ratingData.sentimentBreakdown.moderate,
+          sentimentNeutral: ratingData.sentimentBreakdown.neutral
+        };
+      });
+      
+      // Show sentiment update notification
+      if (ratingData.sentimentBreakdown.positive > 0 || ratingData.sentimentBreakdown.negative > 0) {
+        const sentimentMessage = ratingData.sentimentBreakdown.positive > ratingData.sentimentBreakdown.negative 
+          ? `👍 ${ratingData.sentimentBreakdown.positive} positive feedbacks` 
+          : ratingData.sentimentBreakdown.negative > ratingData.sentimentBreakdown.positive
+          ? `👎 ${ratingData.sentimentBreakdown.negative} negative feedbacks`
+          : `📊 ${ratingData.sentimentBreakdown.moderate} moderate feedbacks`;
+        
+        toast.success(`⭐ Rating: ${ratingData.rating.toFixed(1)}/5. ${sentimentMessage}`, { duration: 4000 });
+      }
+      
+      return ratingData;
+    } catch (error) {
+      console.error('Error updating driver rating:', error);
+      return null;
+    }
+  }, [calculateDriverRating]);
+
+  // ✅ Listen for feedback changes to update driver rating in real-time
+  useEffect(() => {
+    if (!driverId || loading) return;
+    
+    // Listen to feedback changes for this driver
+    const feedbackQuery = query(
+      collection(db, 'feedback'),
+      where('driverId', '==', driverId)
+    );
+    
+    const unsubscribe = onSnapshot(feedbackQuery, async (snapshot) => {
+      // Update rating when feedback changes
+      await updateDriverRating(driverId);
+    }, (error) => {
+      console.error('Error listening to feedback changes:', error);
+    });
+    
+    return () => unsubscribe();
+  }, [driverId, loading, updateDriverRating]);
+
+  // ✅ Update rating when a new feedback is added (triggered by real-time listener)
+  const updateRatingOnFeedback = useCallback(async () => {
+    if (!driverId) return;
+    await updateDriverRating(driverId);
+  }, [driverId, updateDriverRating]);
 
   // Fetch user background
   useEffect(() => {
@@ -444,7 +675,12 @@ export default function EditDriver() {
           heading: data.heading ?? prev.heading,
           completedOrders: data.completedOrders ?? prev.completedOrders,
           totalRevenueToday: data.totalRevenueToday ?? prev.totalRevenueToday,
-          rating: data.rating ?? prev.rating, // ✅ Rating updates live
+          rating: data.rating ?? prev.rating,
+          totalFeedbacks: data.totalFeedbacks ?? prev.totalFeedbacks,
+          sentimentPositive: data.sentimentPositive ?? prev.sentimentPositive,
+          sentimentNegative: data.sentimentNegative ?? prev.sentimentNegative,
+          sentimentModerate: data.sentimentModerate ?? prev.sentimentModerate,
+          sentimentNeutral: data.sentimentNeutral ?? prev.sentimentNeutral,
           isApproved: data.isApproved ?? prev.isApproved,
         };
       });
@@ -493,7 +729,45 @@ export default function EditDriver() {
       
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setDriver({ id: docSnap.id, ...data } as DriverData);
+        
+        // ✅ Calculate rating from feedback if not present
+        let rating = data.rating || 0;
+        let totalFeedbacks = data.totalFeedbacks || 0;
+        let totalRatingPoints = data.totalRatingPoints || 0;
+        
+        // If rating is 0 but there might be feedback, calculate it
+        if (rating === 0) {
+          const ratingData = await calculateDriverRating(driverId);
+          if (ratingData && ratingData.totalFeedbacks > 0) {
+            rating = ratingData.rating;
+            totalFeedbacks = ratingData.totalFeedbacks;
+            totalRatingPoints = ratingData.totalRatingPoints;
+            
+            // Update the driver document with the calculated rating
+            await updateDoc(docRef, {
+              rating: rating,
+              totalFeedbacks: totalFeedbacks,
+              totalRatingPoints: totalRatingPoints,
+              sentimentPositive: ratingData.sentimentBreakdown.positive || 0,
+              sentimentNegative: ratingData.sentimentBreakdown.negative || 0,
+              sentimentModerate: ratingData.sentimentBreakdown.moderate || 0,
+              sentimentNeutral: ratingData.sentimentBreakdown.neutral || 0,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }
+        
+        setDriver({ 
+          id: docSnap.id, 
+          ...data,
+          rating: rating,
+          totalFeedbacks: totalFeedbacks,
+          totalRatingPoints: totalRatingPoints,
+          sentimentPositive: data.sentimentPositive || 0,
+          sentimentNegative: data.sentimentNegative || 0,
+          sentimentModerate: data.sentimentModerate || 0,
+          sentimentNeutral: data.sentimentNeutral || 0
+        } as DriverData);
         setHasExistingPassword(data.hasPasswordSet || false);
         setFormData({
           name: data.name || '',
@@ -1600,13 +1874,16 @@ export default function EditDriver() {
                   </div>
                   <div>
                     <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Rating</p>
-                    {/* ✅ Star Rating Display - Live Updates */}
+                    {/* ✅ Star Rating Display - Live Updates from Feedback with Sentiment Analysis */}
                     <div className="flex items-center space-x-2">
                       <StarRating rating={driver.rating || 0} size="sm" showLabel={false} userBackground={userBackground} />
                       <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                         {driver.rating?.toFixed(1) || '0.0'}
                       </span>
                     </div>
+                    <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                      {driver.totalFeedbacks || 0} feedbacks
+                    </p>
                   </div>
                   <div>
                     <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Driver ID</p>
@@ -1614,24 +1891,68 @@ export default function EditDriver() {
                   </div>
                 </div>
                 
-                {/* ✅ Large Star Rating Display with Reviews Count */}
+                {/* ✅ Large Star Rating Display with Sentiment Breakdown */}
                 <div className="mt-4 pt-4 border-t ${userBackground === 'dark' ? 'border-gray-600' : 'border-gray-200'}">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center space-x-4">
                       <div>
                         <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Driver Rating</p>
                         <StarRating rating={driver.rating || 0} size="md" showLabel={true} userBackground={userBackground} />
                       </div>
                       <div className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Based on {driver.completedOrders || 0} completed orders
+                        Based on {driver.totalFeedbacks || 0} customer feedback{driver.totalFeedbacks !== 1 ? 's' : ''}
                       </div>
                     </div>
                     <div className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} flex items-center space-x-1`}>
                       <span className="text-yellow-400">★</span>
                       <span className="font-medium">{driver.rating?.toFixed(1) || '0.0'}</span>
-                      <span>({driver.completedOrders || 0})</span>
+                      <span>({driver.totalFeedbacks || 0})</span>
+                      {driver.rating && driver.rating >= 4.5 && (
+                        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">⭐ Excellent</span>
+                      )}
+                      {driver.rating && driver.rating >= 3.5 && driver.rating < 4.5 && (
+                        <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">Good</span>
+                      )}
+                      {driver.rating && driver.rating >= 2 && driver.rating < 3.5 && (
+                        <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">Average</span>
+                      )}
+                      {driver.rating && driver.rating < 2 && driver.rating > 0 && (
+                        <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium animate-pulse">⚠️ Poor</span>
+                      )}
+                      {(!driver.rating || driver.rating === 0) && (
+                        <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">No ratings yet</span>
+                      )}
                     </div>
                   </div>
+                  
+                  {/* ✅ Sentiment Breakdown - Shows positive, negative, moderate feedback counts */}
+                  {(driver.sentimentPositive > 0 || driver.sentimentNegative > 0 || driver.sentimentModerate > 0) && (
+                    <div className="mt-3">
+                      <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Sentiment Analysis</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {driver.sentimentPositive > 0 && (
+                          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                            👍 Positive: {driver.sentimentPositive}
+                          </span>
+                        )}
+                        {driver.sentimentNegative > 0 && (
+                          <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                            👎 Negative: {driver.sentimentNegative}
+                          </span>
+                        )}
+                        {driver.sentimentModerate > 0 && (
+                          <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                            📊 Moderate: {driver.sentimentModerate}
+                          </span>
+                        )}
+                        {driver.sentimentNeutral > 0 && (
+                          <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                            😐 Neutral: {driver.sentimentNeutral}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

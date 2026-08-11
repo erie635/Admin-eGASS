@@ -348,6 +348,7 @@ export default function DriversPage() {
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Email</th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Phone</th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Vehicle</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Fuel</th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Status</th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Actions</th>
                 </tr>
@@ -355,7 +356,7 @@ export default function DriversPage() {
               <tbody className={`divide-y ${userBackground === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
                 {filteredDrivers.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className={`px-6 py-8 text-center ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <td colSpan={7} className={`px-6 py-8 text-center ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                       {searchTerm ? 'No drivers match your search' : 'No drivers found. Click "Add Driver" to create one.'}
                     </td>
                   </tr>
@@ -381,6 +382,36 @@ export default function DriversPage() {
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>
                         {driver.vehicleType || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col space-y-0.5">
+                          {driver.remainingFuel?.Petrol !== undefined && (
+                            <span className="text-xs font-medium text-blue-600">
+                              ⛽ {formatFuelValue(driver.remainingFuel.Petrol)} Petrol
+                            </span>
+                          )}
+                          {driver.remainingFuel?.Diesel !== undefined && (
+                            <span className="text-xs font-medium text-green-600">
+                              ⛽ {formatFuelValue(driver.remainingFuel.Diesel)} Diesel
+                            </span>
+                          )}
+                          {driver.remainingFuel?.['V-Power'] !== undefined && (
+                            <span className="text-xs font-medium text-purple-600">
+                              ⛽ {formatFuelValue(driver.remainingFuel['V-Power'])} V-Power
+                            </span>
+                          )}
+                          {driver.remainingFuel?.Kerosene !== undefined && (
+                            <span className="text-xs font-medium text-orange-600">
+                              ⛽ {formatFuelValue(driver.remainingFuel.Kerosene)} Kerosene
+                            </span>
+                          )}
+                          {!driver.remainingFuel?.Petrol && 
+                           !driver.remainingFuel?.Diesel && 
+                           !driver.remainingFuel?.['V-Power'] && 
+                           !driver.remainingFuel?.Kerosene && (
+                            <span className="text-xs text-gray-400">No fuel data</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${

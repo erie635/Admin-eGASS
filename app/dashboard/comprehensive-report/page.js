@@ -2081,6 +2081,7 @@ export default function ComprehensiveReport() {
                   src="/images/logo.png"
                   alt="Company Logo"
                   fill
+                  sizes="80px"
                   className="object-contain"
                   priority
                 />

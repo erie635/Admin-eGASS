@@ -1,5 +1,3 @@
-// app/dashboard/feedback/page.tsx
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -29,6 +27,17 @@ interface Feedback {
   isRead?: boolean;
   reply?: string;
   replyAt?: string;
+  // New fields for order details
+  orderDetails?: {
+    orderId: string;
+    fuelType: string;
+    litres: number;
+    totalAmount: number;
+    deliveryAddress?: string;
+    deliveryDate: string;
+    status?: string;
+    paymentMethod?: string;
+  };
 }
 
 // Debounce hook
@@ -65,9 +74,9 @@ const StarRating = ({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
   const emptyStars = 5 - finalFullStars - (finalHasHalfStar ? 1 : 0);
 
   const sizeClasses = {
-    sm: 'w-3 h-3',
-    md: 'w-4 h-4',
-    lg: 'w-5 h-5'
+    sm: 'w-4 h-4',
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6'
   };
 
   const starClass = sizeClasses[size] || sizeClasses.sm;
@@ -105,26 +114,26 @@ const FeedbackSkeleton = ({ userBackground }: { userBackground: string }) => {
   };
 
   return (
-    <div className={`border rounded-lg p-3 ${getRowClass()} animate-pulse`}>
-      <div className="grid grid-cols-12 gap-2">
-        <div className="col-span-3 space-y-1">
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
-          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+    <div className={`border rounded-lg p-4 ${getRowClass()} animate-pulse`}>
+      <div className="grid grid-cols-12 gap-3">
+        <div className="col-span-3 space-y-1.5">
+          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
         </div>
         <div className="col-span-3">
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-5/6"></div>
+          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-5/6"></div>
         </div>
         <div className="col-span-2">
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-2/3"></div>
+          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-2/3"></div>
         </div>
         <div className="col-span-1 flex justify-center">
-          <div className="h-3 w-12 bg-gray-300 dark:bg-gray-600 rounded"></div>
+          <div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
         </div>
         <div className="col-span-2">
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
         </div>
         <div className="col-span-1 flex justify-center">
-          <div className="h-3 w-3 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
         </div>
       </div>
     </div>
@@ -174,31 +183,31 @@ const StatsSummary = ({ feedbacks, userBackground }: { feedbacks: Feedback[]; us
   };
 
   return (
-    <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 ${getCardClass()} rounded-xl p-4 border`}>
+    <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 ${getCardClass()} rounded-xl p-5 border`}>
       <div className="text-center">
-        <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{total}</p>
-        <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Total</p>
+        <p className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{total}</p>
+        <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Total</p>
       </div>
       <div className="text-center">
         <div className="flex justify-center">
           <StarRating rating={avgRating} size="md" />
         </div>
-        <p className={`text-sm font-bold mt-0.5 ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+        <p className={`text-base font-bold mt-1 ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
           {avgRating.toFixed(1)}
         </p>
-        <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Average</p>
+        <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Average</p>
       </div>
       <div className="text-center">
-        <p className={`text-xl font-bold text-yellow-500`}>
+        <p className={`text-2xl font-bold text-yellow-500`}>
           {ratingDistribution[4] || 0}
         </p>
-        <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>5-Star</p>
+        <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>5-Star</p>
       </div>
       <div className="text-center">
-        <p className={`text-xl font-bold ${unread > 0 ? 'text-red-500 animate-pulse' : userBackground === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+        <p className={`text-2xl font-bold ${unread > 0 ? 'text-red-500 animate-pulse' : userBackground === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
           {unread}
         </p>
-        <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+        <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
           {unread > 0 ? '📬 Unread' : 'Read'}
         </p>
       </div>
@@ -302,6 +311,23 @@ export default function FeedbackPage() {
     }
   };
 
+  // Format date for order details
+  const formatOrderDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'N/A';
+    }
+  };
+
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent, feedbackId: string, index: number) => {
     switch (e.key) {
@@ -327,6 +353,30 @@ export default function FeedbackPage() {
     }
   };
 
+  // Fetch order details for a feedback
+  const fetchOrderDetails = async (orderId: string): Promise<any> => {
+    if (!orderId) return null;
+    try {
+      const orderDoc = await getDoc(doc(db, 'orders', orderId));
+      if (orderDoc.exists()) {
+        const data = orderDoc.data();
+        return {
+          orderId: orderId,
+          fuelType: data.fuelType || data.productType || 'N/A',
+          litres: data.litres || data.quantity || 0,
+          totalAmount: data.totalAmount || data.amount || 0,
+          deliveryAddress: data.deliveryAddress || data.address || '',
+          deliveryDate: data.createdAt || data.deliveryDate || new Date().toISOString(),
+          status: data.status || 'completed',
+          paymentMethod: data.paymentMethod || 'N/A'
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+    }
+    return null;
+  };
+
   // Fetch feedback and driver data
   useEffect(() => {
     const fetchData = async () => {
@@ -334,10 +384,10 @@ export default function FeedbackPage() {
       try {
         const driversSnapshot = await getDocs(collection(db, 'drivers'));
         const driversList: { id: string; name: string }[] = [];
-        driversSnapshot.forEach(doc => {
-          const data = doc.data();
+        driversSnapshot.forEach((driverDoc) => {
+          const data = driverDoc.data();
           driversList.push({
-            id: doc.id,
+            id: driverDoc.id,
             name: data.name || 'Unknown Driver'
           });
         });
@@ -352,10 +402,10 @@ export default function FeedbackPage() {
           const feedbackList: Feedback[] = [];
           let unread = 0;
           
-          for (const doc of snapshot.docs) {
-            const data = doc.data();
+          for (const docSnap of snapshot.docs) {
+            const data = docSnap.data();
             const feedback: Feedback = {
-              id: doc.id,
+              id: docSnap.id,
               userId: data.userId || data.clientId || '',
               customerName: data.customerName || data.clientName || 'Anonymous Client',
               customerEmail: data.customerEmail || data.clientEmail || '',
@@ -379,6 +429,7 @@ export default function FeedbackPage() {
               unread++;
             }
 
+            // Fetch driver name if missing
             if (!feedback.driverName && feedback.driverId) {
               try {
                 const driverDoc = await getDoc(doc(db, 'drivers', feedback.driverId));
@@ -389,6 +440,14 @@ export default function FeedbackPage() {
                 }
               } catch (error) {
                 console.error('Error fetching driver:', error);
+              }
+            }
+
+            // ✅ NEW: Fetch order details if orderId exists
+            if (feedback.orderId) {
+              const orderDetails = await fetchOrderDetails(feedback.orderId);
+              if (orderDetails) {
+                feedback.orderDetails = orderDetails;
               }
             }
 
@@ -501,7 +560,9 @@ export default function FeedbackPage() {
             feedback.customerEmail?.toLowerCase().includes(term) ||
             feedback.driverName?.toLowerCase().includes(term) ||
             feedback.comment?.toLowerCase().includes(term) ||
-            feedback.customerPhone?.includes(term)
+            feedback.customerPhone?.includes(term) ||
+            feedback.orderDetails?.fuelType?.toLowerCase().includes(term) ||
+            feedback.orderDetails?.deliveryAddress?.toLowerCase().includes(term)
           );
         }
         
@@ -549,7 +610,7 @@ export default function FeedbackPage() {
   // Export feedback data
   const exportData = () => {
     const csv = [
-      ['Customer', 'Email', 'Phone', 'Driver', 'Rating', 'Comment', 'Date', 'Read', 'Reply'],
+      ['Customer', 'Email', 'Phone', 'Driver', 'Rating', 'Comment', 'Date', 'Read', 'Reply', 'Order ID', 'Fuel Type', 'Litres', 'Amount', 'Delivery Address'],
       ...feedbacks.map(f => [
         f.customerName,
         f.customerEmail,
@@ -559,7 +620,12 @@ export default function FeedbackPage() {
         f.comment || '',
         new Date(f.createdAt).toLocaleString(),
         f.isRead ? 'Yes' : 'No',
-        f.reply || ''
+        f.reply || '',
+        f.orderId || 'N/A',
+        f.orderDetails?.fuelType || f.fuelType || 'N/A',
+        f.orderDetails?.litres || 0,
+        f.orderDetails?.totalAmount || f.amount || 0,
+        f.orderDetails?.deliveryAddress || 'N/A'
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -576,18 +642,18 @@ export default function FeedbackPage() {
   // Loading skeleton
   if (loading) {
     return (
-      <div className={`p-3 md:p-4 transition-colors duration-300 ${getBackgroundClass()}`}>
-        <div className="max-w-full mx-auto space-y-3">
+      <div className={`p-4 md:p-5 transition-colors duration-300 ${getBackgroundClass()}`}>
+        <div className="max-w-full mx-auto space-y-4">
           <div className="flex items-center justify-between">
-            <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-            <div className="flex gap-2">
-              <div className="h-8 w-20 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
-              <div className="h-8 w-20 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-7 bg-gray-300 dark:bg-gray-700 rounded w-40 animate-pulse"></div>
+            <div className="flex gap-3">
+              <div className="h-9 w-24 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-9 w-24 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
             </div>
           </div>
-          <div className="h-20 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
-          <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
-          <div className="space-y-2">
+          <div className="h-24 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
+          <div className="h-12 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
+          <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
               <FeedbackSkeleton key={i} userBackground={userBackground} />
             ))}
@@ -598,15 +664,15 @@ export default function FeedbackPage() {
   }
 
   return (
-    <div className={`p-3 md:p-4 transition-colors duration-300 ${getBackgroundClass()}`}>
-      <div className="max-w-full mx-auto space-y-3">
+    <div className={`p-4 md:p-5 transition-colors duration-300 ${getBackgroundClass()}`}>
+      <div className="max-w-full mx-auto space-y-4">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className={`text-lg font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            <h1 className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               📝 Feedback
               {unreadCount > 0 && (
-                <span className="ml-2 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full animate-pulse">
+                <span className="ml-2 px-2.5 py-0.5 text-sm bg-red-500 text-white rounded-full animate-pulse">
                   {unreadCount} new
                 </span>
               )}
@@ -616,7 +682,7 @@ export default function FeedbackPage() {
             {unreadCount > 0 && (
               <button
                 onClick={() => setFilter(filter === 'unread' ? 'all' : 'unread')}
-                className={`px-2 py-1 text-xs font-medium rounded-lg transition ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
                   filter === 'unread' 
                     ? 'bg-red-500 text-white' 
                     : 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -627,7 +693,7 @@ export default function FeedbackPage() {
             )}
             <button
               onClick={() => setShowStats(!showStats)}
-              className={`px-2 py-1 text-xs font-medium rounded-lg transition ${
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
                 userBackground === 'dark' 
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -639,21 +705,21 @@ export default function FeedbackPage() {
             <button
               onClick={markAllAsRead}
               disabled={unreadCount === 0}
-              className="px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
               aria-label="Mark all as read"
             >
               Read All
             </button>
             <button
               onClick={exportData}
-              className="px-2 py-1 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition"
+              className="px-3 py-1.5 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition"
               aria-label="Export data"
             >
               📥
             </button>
             <Link
               href="/dashboard"
-              className={`px-2 py-1 text-xs font-medium rounded-lg transition ${
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
                 userBackground === 'dark' 
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -671,14 +737,14 @@ export default function FeedbackPage() {
         )}
 
         {/* Filters - Compact Row */}
-        <div className={`rounded-lg shadow-sm p-2 border ${getCardClass()}`}>
+        <div className={`rounded-lg shadow-sm p-3 border ${getCardClass()}`}>
           <div className="flex flex-wrap gap-2">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search..."
-              className={`flex-1 min-w-[120px] px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`flex-1 min-w-[140px] px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark' 
                   ? 'bg-gray-700 text-white border-gray-600' 
                   : 'bg-white border-gray-300'
@@ -688,7 +754,7 @@ export default function FeedbackPage() {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as typeof filter)}
-              className={`px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark' 
                   ? 'bg-gray-700 text-white border-gray-600' 
                   : 'bg-white border-gray-300'
@@ -703,7 +769,7 @@ export default function FeedbackPage() {
             <select
               value={selectedDriver}
               onChange={(e) => setSelectedDriver(e.target.value)}
-              className={`px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark' 
                   ? 'bg-gray-700 text-white border-gray-600' 
                   : 'bg-white border-gray-300'
@@ -720,7 +786,7 @@ export default function FeedbackPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className={`px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark' 
                   ? 'bg-gray-700 text-white border-gray-600' 
                   : 'bg-white border-gray-300'
@@ -737,7 +803,7 @@ export default function FeedbackPage() {
 
         {/* Results Count */}
         <div className="flex items-center justify-between">
-          <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
             Showing {filteredFeedbacks.length} of {feedbacks.length} feedback entries
             {debouncedSearch && ` (matching "${debouncedSearch}")`}
           </p>
@@ -745,9 +811,9 @@ export default function FeedbackPage() {
 
         {/* Feedback Table - Compact View */}
         {filteredFeedbacks.length > 0 ? (
-          <div className="space-y-1" role="table" aria-label="Feedback list">
+          <div className="space-y-1.5" role="table" aria-label="Feedback list">
             {/* Table Header */}
-            <div className={`grid grid-cols-12 gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg ${userBackground === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+            <div className={`grid grid-cols-12 gap-3 px-4 py-2.5 text-sm font-semibold rounded-lg ${userBackground === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-red-900 text-gray-200'}`}>
               <div className="col-span-3">Customer</div>
               <div className="col-span-3">Comment</div>
               <div className="col-span-2">Driver</div>
@@ -760,13 +826,13 @@ export default function FeedbackPage() {
             {filteredFeedbacks.map((feedback, index) => (
               <div 
                 key={feedback.id} 
-                className={`border rounded-lg ${!feedback.isRead ? 'border-blue-400 border-2' : userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}
+                className={`border rounded-lg ${!feedback.isRead ? 'border-blue-400 border-2' : userBackground === 'dark' ? 'border-gray-700' : 'border-gray-400'}`}
                 data-feedback-id={feedback.id}
               >
                 {/* Main Row - Always visible */}
                 <div 
-                  ref={el => rowRefs.current[feedback.id] = el}
-                  className={`grid grid-cols-12 gap-2 px-3 py-2 text-xs cursor-pointer ${getRowClass()}`}
+                  ref={(el) => { rowRefs.current[feedback.id] = el; }}
+                  className={`grid grid-cols-12 gap-3 px-4 py-3 text-sm cursor-pointer ${getRowClass()}`}
                   onClick={() => toggleExpand(feedback.id)}
                   onKeyDown={(e) => handleKeyDown(e, feedback.id, index)}
                   tabIndex={0}
@@ -776,14 +842,14 @@ export default function FeedbackPage() {
                 >
                   {/* Customer */}
                   <div className="col-span-3 truncate">
-                    <div className="font-medium truncate">
+                    <div className="font-medium truncate text-base">
                       {debouncedSearch ? (
                         <HighlightText text={feedback.customerName} searchTerm={debouncedSearch} />
                       ) : (
                         feedback.customerName
                       )}
                     </div>
-                    <div className={`text-[10px] truncate ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <div className={`text-sm truncate ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                       {debouncedSearch ? (
                         <HighlightText text={feedback.customerEmail || feedback.customerPhone || ''} searchTerm={debouncedSearch} />
                       ) : (
@@ -793,17 +859,17 @@ export default function FeedbackPage() {
                   </div>
                   
                   {/* Comment Preview */}
-                  <div className="col-span-3 truncate text-gray-600 dark:text-gray-300">
+                  <div className="col-span-3 truncate text-sm text-gray-600 dark:text-cyan-600">
                     "{debouncedSearch ? (
-                      <HighlightText text={feedback.comment?.slice(0, 50) || ''} searchTerm={debouncedSearch} />
+                      <HighlightText text={feedback.comment?.slice(0, 60) || ''} searchTerm={debouncedSearch} />
                     ) : (
-                      feedback.comment?.slice(0, 50)
+                      feedback.comment?.slice(0, 60)
                     )}
-                    {feedback.comment?.length > 50 ? '...' : ''}"
+                    {feedback.comment?.length > 60 ? '...' : ''}"
                   </div>
                   
                   {/* Driver */}
-                  <div className="col-span-2 truncate">
+                  <div className="col-span-2 truncate text-sm">
                     {debouncedSearch && feedback.driverName ? (
                       <HighlightText text={feedback.driverName} searchTerm={debouncedSearch} />
                     ) : (
@@ -817,28 +883,28 @@ export default function FeedbackPage() {
                   </div>
                   
                   {/* Date */}
-                  <div className="col-span-2 text-center truncate">
+                  <div className="col-span-2 text-center truncate text-sm">
                     {formatDate(feedback.createdAt)}
                   </div>
                   
                   {/* Status */}
-                  <div className="col-span-1 flex justify-center items-center gap-1">
+                  <div className="col-span-1 flex justify-center items-center gap-1.5">
                     {!feedback.isRead && (
-                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-label="Unread"></span>
+                      <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" aria-label="Unread"></span>
                     )}
                     {feedback.reply && (
-                      <span className="text-[10px] text-green-500" aria-label="Has reply">↩</span>
+                      <span className="text-sm text-green-500" aria-label="Has reply">↩</span>
                     )}
                   </div>
                 </div>
 
                 {/* Expanded Details */}
                 {expandedId === feedback.id && (
-                  <div className={`px-3 py-3 border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} space-y-2`}>
+                  <div className={`px-4 py-3 border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} space-y-3`}>
                     {/* Full Comment */}
                     <div>
-                      <div className={`text-xs font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>💬 Comment</div>
-                      <div className={`p-2 rounded text-xs ${userBackground === 'dark' ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-50 text-gray-700'}`}>
+                      <div className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-blue-700'}`}>💬 Comment</div>
+                      <div className={`p-3 rounded text-sm ${userBackground === 'dark' ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-50 text-gray-700'}`}>
                         {debouncedSearch ? (
                           <HighlightText text={feedback.comment || 'No comment'} searchTerm={debouncedSearch} />
                         ) : (
@@ -847,31 +913,86 @@ export default function FeedbackPage() {
                       </div>
                     </div>
 
+                    {/* ✅ NEW: Order/Delivery Details Section */}
+                    {feedback.orderDetails && (
+                      <div className={`p-3 rounded border ${userBackground === 'dark' ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'}`}>
+                        <div className={`text-sm font-medium mb-2 ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+                          📦 Last Delivery Details
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <span className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Fuel Type:</span>
+                            <span className="font-medium ml-1">{feedback.orderDetails.fuelType}</span>
+                          </div>
+                          <div>
+                            <span className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Litres:</span>
+                            <span className="font-medium ml-1">{feedback.orderDetails.litres}L</span>
+                          </div>
+                          <div>
+                            <span className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Amount:</span>
+                            <span className="font-medium ml-1">KES {feedback.orderDetails.totalAmount.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Delivery Date:</span>
+                            <span className="font-medium ml-1">{formatOrderDate(feedback.orderDetails.deliveryDate)}</span>
+                          </div>
+                          {feedback.orderDetails.deliveryAddress && (
+                            <div className="col-span-2">
+                              <span className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Address:</span>
+                              <span className="font-medium ml-1">{feedback.orderDetails.deliveryAddress}</span>
+                            </div>
+                          )}
+                          {feedback.orderDetails.status && (
+                            <div>
+                              <span className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Status:</span>
+                              <span className={`ml-1 px-2 py-0.5 rounded text-xs font-medium ${
+                                feedback.orderDetails.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                feedback.orderDetails.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                feedback.orderDetails.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {feedback.orderDetails.status}
+                              </span>
+                            </div>
+                          )}
+                          {feedback.orderDetails.paymentMethod && (
+                            <div>
+                              <span className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Payment:</span>
+                              <span className="font-medium ml-1">{feedback.orderDetails.paymentMethod}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Details Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                       <div>
                         <div className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Customer</div>
-                        <div className="font-medium">{feedback.customerName}</div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400">{feedback.customerEmail}</div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400">{feedback.customerPhone}</div>
+                        <div className="font-medium  text-base">{feedback.customerName}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{feedback.customerEmail}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{feedback.customerPhone}</div>
                       </div>
                       <div>
                         <div className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Driver</div>
-                        <div className="font-medium">{feedback.driverName || 'N/A'}</div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400">{feedback.driverPhone || ''}</div>
+                        <div className="font-medium text-base">{feedback.driverName || 'N/A'}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{feedback.driverPhone || ''}</div>
                       </div>
                       <div>
                         <div className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Details</div>
                         <div>Rating: <StarRating rating={feedback.rating || 0} size="sm" /></div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400">{formatDate(feedback.createdAt)}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(feedback.createdAt)}</div>
+                        {feedback.orderId && (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Order: #{feedback.orderId.slice(0, 8)}</div>
+                        )}
                       </div>
                       <div>
                         <div className={`${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Actions</div>
-                        <div className="flex gap-1 mt-0.5 flex-wrap">
+                        <div className="flex gap-1.5 mt-1 flex-wrap">
                           {!feedback.isRead && (
                             <button
                               onClick={(e) => { e.stopPropagation(); handleMarkAsRead(feedback.id); }}
-                              className="px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                              className="px-2 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition"
                               aria-label="Mark as read"
                             >
                               Read
@@ -879,7 +1000,7 @@ export default function FeedbackPage() {
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); setReplyingTo(replyingTo === feedback.id ? null : feedback.id); }}
-                            className="px-1.5 py-0.5 text-[10px] bg-green-500 text-white rounded hover:bg-green-600 transition"
+                            className="px-2 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition"
                             aria-label="Reply to feedback"
                           >
                             Reply
@@ -896,7 +1017,7 @@ export default function FeedbackPage() {
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
                           placeholder="Write reply..."
-                          className={`flex-1 px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                          className={`flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                             userBackground === 'dark' 
                               ? 'bg-gray-700 text-white border-gray-600' 
                               : 'bg-white border-gray-300'
@@ -912,14 +1033,14 @@ export default function FeedbackPage() {
                         <button
                           onClick={() => feedback.id && handleReply(feedback.id)}
                           disabled={isReplying || !replyText.trim()}
-                          className="px-2 py-1 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
+                          className="px-3 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
                           aria-label="Send reply"
                         >
                           Send
                         </button>
                         <button
                           onClick={() => { setReplyingTo(null); setReplyText(''); }}
-                          className="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                          className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
                           aria-label="Cancel reply"
                         >
                           Cancel
@@ -929,7 +1050,7 @@ export default function FeedbackPage() {
 
                     {/* Existing Reply */}
                     {feedback.reply && (
-                      <div className={`p-2 rounded text-xs ${userBackground === 'dark' ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'}`}>
+                      <div className={`p-3 rounded text-sm ${userBackground === 'dark' ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'}`}>
                         <span className="font-medium">Admin:</span> {feedback.reply}
                       </div>
                     )}
@@ -940,18 +1061,18 @@ export default function FeedbackPage() {
             
             {/* Load More Trigger */}
             {!allLoaded && (
-              <div ref={loadMoreRef} className="py-2 text-center">
-                <div className="animate-pulse text-xs text-gray-400">Loading more...</div>
+              <div ref={loadMoreRef} className="py-3 text-center">
+                <div className="animate-pulse text-sm text-gray-400">Loading more...</div>
               </div>
             )}
           </div>
         ) : (
-          <div className={`text-center py-8 rounded-xl border ${getCardClass()}`}>
-            <div className="text-4xl mb-2">📭</div>
-            <h3 className={`text-base font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          <div className={`text-center py-10 rounded-xl border ${getCardClass()}`}>
+            <div className="text-5xl mb-3">📭</div>
+            <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               No Feedback
             </h3>
-            <p className={`text-xs mt-1 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className={`text-sm mt-1.5 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               {feedbacks.length === 0 ? 'No feedback submitted yet.' : 'No matches found.'}
             </p>
           </div>

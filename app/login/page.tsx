@@ -154,8 +154,8 @@ export default function Login() {
             <Image 
               src="/images/logo.png" 
               alt="Logo" 
-              width={96}
-              height={96}
+              fill
+              sizes="96px"
               className="object-contain p-2"
               priority
             />

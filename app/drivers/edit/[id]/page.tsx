@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { db, auth, storage } from '../../../../lib/firebase';
+import { getApps, initializeApp } from 'firebase/app';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, deleteDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { createUserWithEmailAndPassword, updatePassword, signInWithEmailAndPassword, getAuth, updateProfile, deleteUser, sendPasswordResetEmail } from 'firebase/auth';
@@ -13,7 +14,7 @@ import toast from 'react-hot-toast';
 const StarRating = ({ rating, size = 'sm', showLabel = true, userBackground = 'white' }: { rating: number; size?: 'sm' | 'md' | 'lg'; showLabel?: boolean; userBackground?: string }) => {
   // Ensure rating is a valid number between 0 and 5
   const validRating = Math.max(0, Math.min(5, rating || 0));
-  
+ 
   // Calculate stars with refined half-star logic
   const fullStars = Math.floor(validRating);
   const decimal = validRating - fullStars;
@@ -45,10 +46,10 @@ const StarRating = ({ rating, size = 'sm', showLabel = true, userBackground = 'w
     <div className="flex items-center space-x-1" role="img" aria-label={getAriaLabel()}>
       {/* Full Stars - Gold/Yellow */}
       {[...Array(Math.max(0, finalFullStars))].map((_, i) => (
-        <svg 
-          key={`full_${i}`} 
-          className={`${starClass} text-yellow-400 drop-shadow-sm`} 
-          fill="currentColor" 
+        <svg
+          key={`full_${i}`}
+          className={`${starClass} text-yellow-400 drop-shadow-sm`}
+          fill="currentColor"
           viewBox="0 0 20 20"
           aria-hidden="true"
           role="presentation"
@@ -59,9 +60,9 @@ const StarRating = ({ rating, size = 'sm', showLabel = true, userBackground = 'w
 
       {/* Half Star - Gold/Yellow */}
       {finalHasHalfStar && (
-        <svg 
-          className={`${starClass} text-yellow-400 drop-shadow-sm`} 
-          fill="currentColor" 
+        <svg
+          className={`${starClass} text-yellow-400 drop-shadow-sm`}
+          fill="currentColor"
           viewBox="0 0 20 20"
           aria-hidden="true"
           role="presentation"
@@ -72,10 +73,10 @@ const StarRating = ({ rating, size = 'sm', showLabel = true, userBackground = 'w
 
       {/* Empty Stars - Gray */}
       {[...Array(Math.max(0, emptyStars))].map((_, i) => (
-        <svg 
-          key={`empty_${i}`} 
-          className={`${starClass} text-gray-300 drop-shadow-sm`} 
-          fill="currentColor" 
+        <svg
+          key={`empty_${i}`}
+          className={`${starClass} text-gray-300 drop-shadow-sm`}
+          fill="currentColor"
           viewBox="0 0 20 20"
           aria-hidden="true"
           role="presentation"
@@ -123,9 +124,13 @@ interface DriverData {
   authUserId?: string;
   latitude?: number;
   longitude?: number;
+  lat?: number;
+  lng?: number;
   speed?: number;
   heading?: number;
   lastUpdate?: string;
+  locationUpdatedAt?: string;
+  lastLocationUpdate?: string;
   isApproved?: boolean;
   profileComplete?: boolean;
   rating?: number;
@@ -155,9 +160,19 @@ interface DriverData {
   lastOfflineTime?: string | null;
   totalFeedbacks?: number;
   totalRatingPoints?: number;
+  // Sentiment counts stored on the driver document and updated from feedback.
+  sentimentPositive?: number;
+  sentimentNegative?: number;
+  sentimentModerate?: number;
+  sentimentNeutral?: number;
 }
 
 export default function EditDriver() {
+  // Location is considered live only when Firestore has received a recent GPS update.
+  // The Flutter driver app should write latitude/longitude and lastUpdate (or
+  // locationUpdatedAt/lastLocationUpdate) to the same drivers/{driverId} document.
+  const LIVE_LOCATION_FRESH_MS = 15_000;
+  const LOCATION_STALE_MS = 60_000;
   const router = useRouter();
   const params = useParams();
   const driverId = params?.id as string;
@@ -199,6 +214,7 @@ export default function EditDriver() {
     'V-Power': 0
   });
   const [userBackground, setUserBackground] = useState('white');
+  const [locationNow, setLocationNow] = useState(() => Date.now());
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -277,7 +293,7 @@ export default function EditDriver() {
 
     // Calculate total sentiment score
     const totalScore = positiveScore - negativeScore + (moderateScore * 0.3);
-    
+   
     if (totalScore > 1) {
       return { sentiment: 'positive', score: totalScore };
     } else if (totalScore < -1) {
@@ -298,7 +314,7 @@ export default function EditDriver() {
         where('driverId', '==', driverId)
       );
       const feedbackSnapshot = await getDocs(feedbackQuery);
-      
+     
       const feedbacks = feedbackSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -308,24 +324,24 @@ export default function EditDriver() {
           comment: data.comment || ''
         };
       });
-      
+     
       const totalFeedbacks = feedbacks.length;
-      
+     
       if (totalFeedbacks === 0) {
         return { rating: 0, totalFeedbacks: 0, totalRatingPoints: 0, sentimentBreakdown: { positive: 0, negative: 0, moderate: 0, neutral: 0 } };
       }
-      
+     
       // Calculate rating from stars
       const totalRatingPoints = feedbacks.reduce((sum, f) => sum + (f.rating || 0), 0);
       const averageRating = totalRatingPoints / totalFeedbacks;
-      
+     
       // ✅ Analyze sentiment for each feedback and adjust rating
       let adjustedRating = averageRating;
       let sentimentBreakdown = { positive: 0, negative: 0, moderate: 0, neutral: 0 };
-      
+     
       feedbacks.forEach(feedback => {
         const sentiment = analyzeSentiment(feedback.comment);
-        
+       
         if (sentiment.sentiment === 'positive') {
           sentimentBreakdown.positive++;
           // If comment is positive but rating is low, boost rating slightly
@@ -345,13 +361,13 @@ export default function EditDriver() {
           sentimentBreakdown.neutral++;
         }
       });
-      
+     
       // Ensure rating stays within 0-5 range
       adjustedRating = Math.max(0, Math.min(5, adjustedRating));
-      
+     
       // Round to 1 decimal place
       const finalRating = Math.round(adjustedRating * 10) / 10;
-      
+     
       return {
         rating: finalRating,
         totalFeedbacks: totalFeedbacks,
@@ -371,7 +387,7 @@ export default function EditDriver() {
     try {
       const ratingData = await calculateDriverRating(driverId);
       if (!ratingData) return;
-      
+     
       const driverRef = doc(db, 'drivers', driverId);
       await updateDoc(driverRef, {
         rating: ratingData.rating,
@@ -383,7 +399,7 @@ export default function EditDriver() {
         sentimentNeutral: ratingData.sentimentBreakdown.neutral,
         updatedAt: new Date().toISOString()
       });
-      
+     
       // Update local driver state
       setDriver(prev => {
         if (!prev) return null;
@@ -398,18 +414,18 @@ export default function EditDriver() {
           sentimentNeutral: ratingData.sentimentBreakdown.neutral
         };
       });
-      
+     
       // Show sentiment update notification
       if (ratingData.sentimentBreakdown.positive > 0 || ratingData.sentimentBreakdown.negative > 0) {
-        const sentimentMessage = ratingData.sentimentBreakdown.positive > ratingData.sentimentBreakdown.negative 
-          ? `👍 ${ratingData.sentimentBreakdown.positive} positive feedbacks` 
+        const sentimentMessage = ratingData.sentimentBreakdown.positive > ratingData.sentimentBreakdown.negative
+          ? `👍 ${ratingData.sentimentBreakdown.positive} positive feedbacks`
           : ratingData.sentimentBreakdown.negative > ratingData.sentimentBreakdown.positive
           ? `👎 ${ratingData.sentimentBreakdown.negative} negative feedbacks`
           : `📊 ${ratingData.sentimentBreakdown.moderate} moderate feedbacks`;
-        
+       
         toast.success(`⭐ Rating: ${ratingData.rating.toFixed(1)}/5. ${sentimentMessage}`, { duration: 4000 });
       }
-      
+     
       return ratingData;
     } catch (error) {
       console.error('Error updating driver rating:', error);
@@ -420,20 +436,20 @@ export default function EditDriver() {
   // ✅ Listen for feedback changes to update driver rating in real-time
   useEffect(() => {
     if (!driverId || loading) return;
-    
+   
     // Listen to feedback changes for this driver
     const feedbackQuery = query(
       collection(db, 'feedback'),
       where('driverId', '==', driverId)
     );
-    
+   
     const unsubscribe = onSnapshot(feedbackQuery, async (snapshot) => {
       // Update rating when feedback changes
       await updateDriverRating(driverId);
     }, (error) => {
       console.error('Error listening to feedback changes:', error);
     });
-    
+   
     return () => unsubscribe();
   }, [driverId, loading, updateDriverRating]);
 
@@ -442,6 +458,14 @@ export default function EditDriver() {
     if (!driverId) return;
     await updateDriverRating(driverId);
   }, [driverId, updateDriverRating]);
+
+  // Keep the live-location age indicator accurate even when Firestore is quiet.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (isMountedRef.current) setLocationNow(Date.now());
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   // Fetch user background
   useEffect(() => {
@@ -531,7 +555,7 @@ export default function EditDriver() {
   // Listen for main tank stock updates (hidden from UI)
   useEffect(() => {
     if (!driverId || loading) return;
-    
+   
     const companyRef = doc(db, 'company', 'fuelStock');
     const unsubscribe = onSnapshot(companyRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -592,11 +616,11 @@ export default function EditDriver() {
   const setupRealtimeListener = useCallback(() => {
     if (!driverId || !isMountedRef.current) return () => {};
     const docRef = doc(db, 'drivers', driverId);
-    
+   
     return onSnapshot(docRef, (docSnap) => {
       if (!isMountedRef.current || !docSnap.exists()) return;
       const data = docSnap.data();
-      
+     
       let statusChanged = false;
       let statusMessage = '';
       let fuelChanged = false;
@@ -605,7 +629,7 @@ export default function EditDriver() {
       setFormData(prev => {
         const isOnlineChanged = prev.isOnline !== data.isOnline;
         const statusChangedLocal = prev.status !== data.status;
-        
+       
         if ((isOnlineChanged || statusChangedLocal) && !toastShownRef.current) {
           statusChanged = true;
           statusMessage = `⚠️ Driver status updated to ${data.isOnline ? '🟢 Online' : '⚪ Offline'} (from driver app)`;
@@ -650,7 +674,7 @@ export default function EditDriver() {
             }
           }
         }
-        
+       
         return {
           ...prev,
           isOnline: data.isOnline ?? false,
@@ -669,10 +693,14 @@ export default function EditDriver() {
           lastSaleLitres: data.lastSaleLitres ?? prev.lastSaleLitres,
           lastSaleAmount: data.lastSaleAmount ?? prev.lastSaleAmount,
           lastSaleTime: data.lastSaleTime ?? prev.lastSaleTime,
-          latitude: data.latitude ?? prev.latitude,
-          longitude: data.longitude ?? prev.longitude,
+          latitude: data.latitude ?? data.lat ?? prev.latitude,
+          longitude: data.longitude ?? data.lng ?? prev.longitude,
+          lat: data.lat ?? data.latitude ?? prev.lat,
+          lng: data.lng ?? data.longitude ?? prev.lng,
           speed: data.speed ?? prev.speed,
           heading: data.heading ?? prev.heading,
+          locationUpdatedAt: data.locationUpdatedAt ?? prev.locationUpdatedAt,
+          lastLocationUpdate: data.lastLocationUpdate ?? prev.lastLocationUpdate,
           completedOrders: data.completedOrders ?? prev.completedOrders,
           totalRevenueToday: data.totalRevenueToday ?? prev.totalRevenueToday,
           rating: data.rating ?? prev.rating,
@@ -726,15 +754,15 @@ export default function EditDriver() {
       console.log('🔄 Fetching driver with ID:', driverId);
       const docRef = doc(db, 'drivers', driverId);
       const docSnap = await getDoc(docRef);
-      
+     
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
+       
         // ✅ Calculate rating from feedback if not present
         let rating = data.rating || 0;
         let totalFeedbacks = data.totalFeedbacks || 0;
         let totalRatingPoints = data.totalRatingPoints || 0;
-        
+       
         // If rating is 0 but there might be feedback, calculate it
         if (rating === 0) {
           const ratingData = await calculateDriverRating(driverId);
@@ -742,7 +770,7 @@ export default function EditDriver() {
             rating = ratingData.rating;
             totalFeedbacks = ratingData.totalFeedbacks;
             totalRatingPoints = ratingData.totalRatingPoints;
-            
+           
             // Update the driver document with the calculated rating
             await updateDoc(docRef, {
               rating: rating,
@@ -756,10 +784,14 @@ export default function EditDriver() {
             });
           }
         }
-        
-        setDriver({ 
-          id: docSnap.id, 
+       
+        setDriver({
+          id: docSnap.id,
           ...data,
+          latitude: data.latitude ?? data.lat,
+          longitude: data.longitude ?? data.lng,
+          lat: data.lat ?? data.latitude,
+          lng: data.lng ?? data.longitude,
           rating: rating,
           totalFeedbacks: totalFeedbacks,
           totalRatingPoints: totalRatingPoints,
@@ -783,7 +815,7 @@ export default function EditDriver() {
           pricePerKm: data.pricePerKm || 0,
           userType: data.userType || 'driver'
         });
-        
+       
         if (data.photoURL) {
           setIsPhotoLoading(true);
           setPhotoPreview(data.photoURL);
@@ -807,13 +839,13 @@ export default function EditDriver() {
       const now = new Date().toISOString();
       const docRef = doc(db, 'drivers', driverId);
       const docSnap = await getDoc(docRef);
-      
+     
       if (!docSnap.exists()) {
         toast.error('Driver document not found. Please refresh the page.');
         setUpdatingStatus(false);
         return;
       }
-      
+     
       const newStatus = !formData.isOnline;
       const historyEntry = {
         timestamp: now,
@@ -829,7 +861,6 @@ export default function EditDriver() {
         lastOfflineTime: !newStatus ? now : driver?.lastOfflineTime || null,
         onlineHistory: newStatus ? [...(driver?.onlineHistory || []), historyEntry] : driver?.onlineHistory || [],
         offlineHistory: !newStatus ? [...(driver?.offlineHistory || []), historyEntry] : driver?.offlineHistory || [],
-        lastUpdate: now
       });
 
       setFormData(prev => ({ ...prev, isOnline: newStatus, status: newStatus ? 'available' : 'offline' }));
@@ -872,10 +903,10 @@ export default function EditDriver() {
     if (!email || email.trim() === '') return false;
     if (email.trim().toLowerCase() === driver?.email?.toLowerCase()) return false;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
-    
+   
     const cacheKey = `${email}_${currentDriverId}`;
     if (emailCheckCache.current.has(cacheKey)) return emailCheckCache.current.get(cacheKey) || false;
-    
+   
     try {
       const driversRef = collection(db, 'drivers');
       const q = query(driversRef, where('email', '==', email.trim()));
@@ -895,9 +926,9 @@ export default function EditDriver() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     let newValue: any = type === 'checkbox' ? (e.target as HTMLInputElement).checked : type === 'number' ? parseFloat(value) || 0 : value;
-    
+   
     setFormData(prev => ({ ...prev, [name]: newValue }));
-    
+   
     if (name === 'email' && value && driver?.email !== value) {
       checkEmailExists(value, driverId).then(exists => {
         setEmailError(exists);
@@ -916,9 +947,9 @@ export default function EditDriver() {
   const handleFuelChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const numValue = name === 'amount' ? parseFloat(value) || 0 : value;
-    
+   
     const availableFuel = mainTankStock[fuelData.fuelType] || 0;
-    
+   
     if (name === 'amount' && numValue > availableFuel && availableFuel > 0) {
       toast.error(` Maximum available is ${availableFuel.toFixed(1)}L for ${fuelData.fuelType}`, {
         duration: 3000,
@@ -927,7 +958,7 @@ export default function EditDriver() {
       setFuelData(prev => ({ ...prev, [name]: availableFuel }));
       return;
     }
-    
+   
     setFuelData(prev => ({ ...prev, [name]: numValue }));
   };
 
@@ -942,27 +973,41 @@ export default function EditDriver() {
         setDeletingDriver(false);
         return;
       }
-      
+     
       if (driver?.photoURL) {
-        try {
-          await deleteObject(ref(storage, `drivers/${driverId}/profile`));
-        } catch (error) {
-          console.error('❌ No photo to delete:', error);
+        const storedPath = getStoredPhotoPath(driver.photoURL);
+        const candidatePaths = [
+          storedPath,
+          `drivers/${driverId}/profile.jpg`,
+          `drivers/${driverId}/profile.jpeg`,
+          `drivers/${driverId}/profile.png`,
+          `drivers/${driverId}/profile.gif`,
+          `drivers/${driverId}/profile.webp`,
+          `drivers/${driverId}/profile`
+        ].filter(Boolean) as string[];
+
+        for (const path of [...new Set(candidatePaths)]) {
+          try {
+            await deleteObject(ref(storage, path));
+            break;
+          } catch {
+            // Try the next known path.
+          }
         }
       }
-      
+     
       try {
         const authInstance = getAuth();
         const currentUser = authInstance.currentUser;
         if (currentUser && currentUser.uid === driverId) {
           await deleteUser(currentUser);
         } else {
-          toast.error('⚠️ Auth account deletion requires Admin SDK. Please use Firebase Console for auth cleanup.', { duration: 5000 });
+          toast.error('⚠️ Auth account deletion requires the Firebase Admin SDK. The Firestore driver record will still be removed.', { duration: 5000 });
         }
       } catch (authError) {
         console.log('ℹ️ Could not delete from Auth:', authError);
       }
-      
+     
       await deleteDoc(docRef);
       toast.success('Driver deleted successfully!');
       router.push('/drivers');
@@ -996,7 +1041,7 @@ export default function EditDriver() {
       const currentUser = auth.currentUser;
       let adminName = 'Admin';
       let adminId = 'admin';
-      
+     
       if (currentUser) {
         adminId = currentUser.uid;
         if (currentUser.displayName) {
@@ -1004,7 +1049,7 @@ export default function EditDriver() {
         } else if (currentUser.email) {
           adminName = currentUser.email.split('@')[0];
         }
-        
+       
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
           if (userDoc.exists()) {
@@ -1106,7 +1151,6 @@ export default function EditDriver() {
           remainingFuel: updatedDriverFuel,
           fuelUpdatedAt: new Date().toISOString(),
           fuelHistory: updatedDriverHistory,
-          lastUpdate: new Date().toISOString()
         });
 
         return {
@@ -1150,7 +1194,7 @@ export default function EditDriver() {
       }
     } catch (error: any) {
       console.error(' Error topping up fuel:', error);
-      
+     
       if (error.message && error.message.includes('INSUFFICIENT_FUEL')) {
         const parts = error.message.split(':');
         if (parts.length === 3) {
@@ -1191,6 +1235,18 @@ export default function EditDriver() {
     reader.readAsDataURL(file);
   };
 
+  const getStoredPhotoPath = (photoUrl?: string | null) => {
+    if (!photoUrl) return null;
+    try {
+      const decoded = decodeURIComponent(photoUrl);
+      const match = decoded.match(/\/o\/(.+?)(?:\?|$)/);
+      if (match?.[1]) return match[1].replace(/%2F/g, '/');
+    } catch {
+      // Fall back to the known current storage location below.
+    }
+    return null;
+  };
+
   const handleSavePhoto = async () => {
     if (!selectedFile || !driverId) { toast.error('No file selected'); return; }
 
@@ -1205,16 +1261,30 @@ export default function EditDriver() {
         setUploadingPhoto(false);
         return;
       }
-      
+     
       if (driver?.photoURL) {
-        try {
-          await deleteObject(ref(storage, `drivers/${driverId}/profile`));
-        } catch (error) {
-          console.log('ℹ️ No old photo to delete:', error);
+        const storedPath = getStoredPhotoPath(driver.photoURL);
+        const candidatePaths = [
+          storedPath,
+          `drivers/${driverId}/profile.jpg`,
+          `drivers/${driverId}/profile.jpeg`,
+          `drivers/${driverId}/profile.png`,
+          `drivers/${driverId}/profile.gif`,
+          `drivers/${driverId}/profile.webp`,
+          `drivers/${driverId}/profile`
+        ].filter(Boolean) as string[];
+
+        for (const path of [...new Set(candidatePaths)]) {
+          try {
+            await deleteObject(ref(storage, path));
+            break;
+          } catch {
+            // Try the next known path.
+          }
         }
       }
 
-      const fileExtension = selectedFile.name.split('.').pop() || 'jpg';
+      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase() || 'jpg';
       const storageRef = ref(storage, `drivers/${driverId}/profile.${fileExtension}`);
       const uploadTask = uploadBytesResumable(storageRef, selectedFile, { contentType: selectedFile.type });
 
@@ -1238,8 +1308,7 @@ export default function EditDriver() {
             await updateDoc(docRef, {
               photoURL: downloadURL,
               driverPhoto: downloadURL,
-              updatedAt: new Date().toISOString(),
-              lastUpdate: new Date().toISOString()
+              updatedAt: new Date().toISOString()
             });
 
             setPhotoPreview(downloadURL);
@@ -1274,8 +1343,30 @@ export default function EditDriver() {
         toast.error('Driver document not found. Please refresh the page.');
         return;
       }
-      
-      await deleteObject(ref(storage, `drivers/${driverId}/profile`));
+     
+      const storedPath = getStoredPhotoPath(driver.photoURL);
+      const candidatePaths = [
+        storedPath,
+        `drivers/${driverId}/profile.jpg`,
+        `drivers/${driverId}/profile.jpeg`,
+        `drivers/${driverId}/profile.png`,
+        `drivers/${driverId}/profile.gif`,
+        `drivers/${driverId}/profile.webp`,
+        `drivers/${driverId}/profile`
+      ].filter(Boolean) as string[];
+
+      let deleted = false;
+      for (const path of [...new Set(candidatePaths)]) {
+        try {
+          await deleteObject(ref(storage, path));
+          deleted = true;
+          break;
+        } catch {
+          // Try the next known path.
+        }
+      }
+      if (!deleted) console.log('ℹ️ Storage photo object was already missing.');
+
       await updateDoc(docRef, { photoURL: null, driverPhoto: null, updatedAt: new Date().toISOString() });
       setPhotoPreview(null);
       setSelectedFile(null);
@@ -1295,51 +1386,65 @@ export default function EditDriver() {
     return phone;
   };
 
+  const getDriverAuth = useCallback(() => {
+    const appName = `egas-driver-auth-${driverId}`;
+    const existingApp = getApps().find(app => app.name === appName);
+    const driverApp = existingApp || initializeApp(auth.app.options, appName);
+    return getAuth(driverApp);
+  }, [driverId]);
+
   const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!passwordData.newPassword || !passwordData.confirmPassword) {
-      toast.error('Please fill in both password fields');
+  e.preventDefault();
+ 
+  if (!passwordData.newPassword || !passwordData.confirmPassword) {
+    toast.error('Please fill in both password fields');
+    return;
+  }
+  if (passwordData.newPassword !== passwordData.confirmPassword) {
+    toast.error('New passwords do not match');
+    return;
+  }
+  if (passwordData.newPassword.length < 6) {
+    toast.error('Password must be at least 6 characters');
+    return;
+  }
+
+  setUpdatingPassword(true);
+  try {
+    const currentUser = auth.currentUser;
+   
+    if (!currentUser) {
+      toast.error('You must be logged in as admin to change driver passwords');
+      setUpdatingPassword(false);
       return;
     }
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error('New passwords do not match');
+
+    const driverEmail = driver?.email;
+    const driverName = driver?.name;
+
+    if (!driverEmail) {
+      toast.error('Driver email not found. Please update the email first.');
+      setUpdatingPassword(false);
       return;
     }
-    if (passwordData.newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
 
-    setUpdatingPassword(true);
-    try {
-      const currentUser = auth.currentUser;
-      
-      if (!currentUser) {
-        toast.error('You must be logged in as admin to change driver passwords');
-        setUpdatingPassword(false);
-        return;
-      }
+    // Get the admin token for authentication
+    const adminToken = await currentUser.getIdToken();
 
-      const driverEmail = driver?.email;
-      const driverName = driver?.name;
-
-      if (!driverEmail) {
-        toast.error('Driver email not found. Please update the email first.');
-        setUpdatingPassword(false);
-        return;
-      }
-
+    // First, check if the driver has an authUserId
+    if (!driver?.authUserId && !driver?.userId) {
+      // Driver doesn't have an auth account, create one
       try {
+        const driverAuth = getDriverAuth();
         const userCredential = await createUserWithEmailAndPassword(
-          auth, 
-          driverEmail, 
+          driverAuth,
+          driverEmail,
           passwordData.newPassword
         );
-        
+       
         const uid = userCredential.user.uid;
         await updateProfile(userCredential.user, { displayName: driverName || '' });
-        
+       
         const driverRef = doc(db, 'drivers', driverId);
         await updateDoc(driverRef, {
           hasPasswordSet: true,
@@ -1351,85 +1456,176 @@ export default function EditDriver() {
         setHasExistingPassword(true);
         toast.success(`✅ Password created successfully for ${driverName}!`, {
           duration: 4000,
-          icon: ''
+          icon: '🔐'
         });
 
         setShowPasswordModal(false);
         setPasswordData({ newPassword: '', confirmPassword: '' });
         setUpdatingPassword(false);
         return;
-
       } catch (error: any) {
         if (error.code === 'auth/email-already-in-use') {
-          try {
-            await sendPasswordResetEmail(auth, driverEmail);
-            
-            const driverRef = doc(db, 'drivers', driverId);
-            await updateDoc(driverRef, {
-              passwordResetSent: new Date().toISOString(),
-              hasPasswordSet: true,
-              needsPasswordReset: true
-            });
-
-            toast.success(`📧 Password reset email sent to ${driverEmail}`, {
-              duration: 5000,
-              icon: '📧'
-            });
-            
-            toast.info('The driver will receive an email to set their own password.', {
-              duration: 4000,
-              icon: 'ℹ️'
-            });
-
-            setShowPasswordModal(false);
-            setPasswordData({ newPassword: '', confirmPassword: '' });
-            
-          } catch (resetError: any) {
-            console.error(' Reset email error:', resetError);
-            
-            if (resetError.code === 'auth/user-not-found') {
-              toast.error('Driver account not found. Please create the account first.');
-            } else if (resetError.code === 'auth/too-many-requests') {
-              toast.error('Too many requests. Please try again later.');
-            } else {
-              toast.error('Failed to send reset email: ' + (resetError.message || 'Unknown error'));
-            }
-          }
-          setUpdatingPassword(false);
-          return;
+          // Email exists but authUserId might not be set in Firestore
+          // Try to update the password using the API
+          toast.info('Account exists. Attempting to update password...');
         } else {
           throw error;
         }
       }
+    }
 
+    // If we have an authUserId or the email exists, use the Admin API to update
+    try {
+      const response = await fetch('/api/admin/drivers/update-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          driverId: driverId,
+          newPassword: passwordData.newPassword,
+          adminToken: adminToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 404 && data.error?.includes('authentication account')) {
+          // Driver doesn't have an auth account, create one
+          try {
+            const driverAuth = getDriverAuth();
+            const userCredential = await createUserWithEmailAndPassword(
+              driverAuth,
+              driverEmail,
+              passwordData.newPassword
+            );
+           
+            const uid = userCredential.user.uid;
+            await updateProfile(userCredential.user, { displayName: driverName || '' });
+           
+            const driverRef = doc(db, 'drivers', driverId);
+            await updateDoc(driverRef, {
+              hasPasswordSet: true,
+              authUserId: uid,
+              userId: uid,
+              passwordUpdatedAt: new Date().toISOString()
+            });
+
+            setHasExistingPassword(true);
+            toast.success(`✅ Password created successfully for ${driverName}!`, {
+              duration: 4000,
+              icon: '🔐'
+            });
+
+            setShowPasswordModal(false);
+            setPasswordData({ newPassword: '', confirmPassword: '' });
+            setUpdatingPassword(false);
+            return;
+          } catch (createError: any) {
+            if (createError.code === 'auth/email-already-in-use') {
+              toast.info('Account already exists. Please try updating the password again.');
+            } else {
+              throw createError;
+            }
+          }
+        } else {
+          throw new Error(data.error || 'Failed to update password');
+        }
+      }
+
+      // Success
+      if (data.success) {
+        toast.success(`✅ Password updated successfully for ${driverName}!`, {
+          duration: 4000,
+          icon: '🔐'
+        });
+
+        // Update local state
+        setHasExistingPassword(true);
+        setDriver(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            hasPasswordSet: true,
+            authUserId: data.authUserId || prev.authUserId,
+            passwordUpdatedAt: new Date().toISOString()
+          };
+        });
+
+        setShowPasswordModal(false);
+        setPasswordData({ newPassword: '', confirmPassword: '' });
+      }
     } catch (error: any) {
-      console.error(' Error updating password:', error);
-      if (error.code === 'auth/weak-password') {
-        toast.error('Password is too weak. Use at least 6 characters with a mix of letters and numbers.');
-      } else if (error.code === 'auth/email-already-in-use') {
-        toast.error(' Email already registered. A reset email has been sent.');
-      } else if (error.code === 'auth/too-many-requests') {
-        toast.error('Too many requests. Please try again later.');
+      console.error('Error updating password through API:', error);
+      
+      // Fallback: If API fails, try sending reset email
+      if (error.message?.includes('not found') || error.message?.includes('authentication account')) {
+        try {
+          await sendPasswordResetEmail(auth, driverEmail);
+          
+          const driverRef = doc(db, 'drivers', driverId);
+          await updateDoc(driverRef, {
+            passwordResetSent: new Date().toISOString(),
+            hasPasswordSet: true,
+            needsPasswordReset: true
+          });
+
+          toast.success(`📧 Password reset email sent to ${driverEmail}`, {
+            duration: 5000,
+            icon: '📧'
+          });
+          
+          toast.success('The driver will receive an email to set their own password.', {
+            duration: 4000,
+            icon: 'ℹ️'
+          });
+
+          setShowPasswordModal(false);
+          setPasswordData({ newPassword: '', confirmPassword: '' });
+        } catch (resetError: any) {
+          console.error('Reset email error:', resetError);
+          
+          if (resetError.code === 'auth/user-not-found') {
+            toast.error('Driver account not found. Please create the account first.');
+          } else if (resetError.code === 'auth/too-many-requests') {
+            toast.error('Too many requests. Please try again later.');
+          } else {
+            toast.error('Failed to send reset email: ' + (resetError.message || 'Unknown error'));
+          }
+        }
       } else {
         toast.error('Failed to update password: ' + (error.message || 'Unknown error'));
       }
-    } finally {
-      setUpdatingPassword(false);
     }
-  };
+  } catch (error: any) {
+    console.error('Error updating password:', error);
+    if (error.code === 'auth/weak-password') {
+      toast.error('Password is too weak. Use at least 6 characters with a mix of letters and numbers.');
+    } else if (error.code === 'auth/email-already-in-use') {
+      toast.error('Email already registered. A reset email has been sent.');
+    } else if (error.code === 'auth/too-many-requests') {
+      toast.error('Too many requests. Please try again later.');
+    } else {
+      toast.error('Failed to update password: ' + (error.message || 'Unknown error'));
+    }
+  } finally {
+    setUpdatingPassword(false);
+  }
+};
 
   const createDriverAccount = async (email: string, password: string, name: string, phone: string) => {
     try {
-      const authInstance = auth;
+      const authInstance = getDriverAuth();
       try {
         const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
         const uid = userCredential.user.uid;
         await updateProfile(userCredential.user, { displayName: name });
-        
+       
         const formattedPhone = formatPhoneNumber(phone);
         const driverRef = doc(db, 'drivers', driverId);
         const docSnap = await getDoc(driverRef);
-        
+       
         if (!docSnap.exists()) {
           await setDoc(doc(db, 'drivers', uid), {
             userId: uid,
@@ -1452,6 +1648,8 @@ export default function EditDriver() {
             speed: 0.0,
             latitude: 0.0,
             longitude: 0.0,
+            locationUpdatedAt: null,
+            lastLocationUpdate: null,
             activeOrderId: null,
             orderStartedAt: null,
             currentClientName: null,
@@ -1568,7 +1766,7 @@ export default function EditDriver() {
         setSaving(false);
         return;
       }
-      
+     
       const currentEmail = driver?.email;
       const newEmail = formData.email;
       if (currentEmail !== newEmail && newEmail) {
@@ -1580,7 +1778,7 @@ export default function EditDriver() {
           return;
         }
       }
-      
+     
       await updateDoc(docRef, {
         name: formData.name,
         email: formData.email,
@@ -1594,8 +1792,7 @@ export default function EditDriver() {
         isApproved: formData.isApproved,
         pricePerKm: formData.pricePerKm,
         userType: 'driver',
-        updatedAt: new Date().toISOString(),
-        lastUpdate: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       });
 
       toast.success('Driver updated successfully!');
@@ -1610,41 +1807,92 @@ export default function EditDriver() {
 
   // Driver Location Display
   const DriverLocationDisplay = useMemo(() => {
-    if (driver?.latitude === undefined || driver?.longitude === undefined) return null;
+    const latitude = Number(driver?.latitude ?? driver?.lat);
+    const longitude = Number(driver?.longitude ?? driver?.lng);
+    const hasValidCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude) && !(latitude === 0 && longitude === 0);
+    const timestampValue = driver?.locationUpdatedAt || driver?.lastLocationUpdate || driver?.lastUpdate;
+    const timestamp = timestampValue ? new Date(timestampValue).getTime() : NaN;
+    const ageMs = Number.isFinite(timestamp) ? Math.max(0, locationNow - timestamp) : Infinity;
+
+    let locationStatus: 'live' | 'stale' | 'offline' | 'unknown' = 'unknown';
+    if (!hasValidCoordinates) {
+      locationStatus = 'unknown';
+    } else if (!Number.isFinite(timestamp)) {
+      locationStatus = 'unknown';
+    } else if (ageMs <= LIVE_LOCATION_FRESH_MS) {
+      locationStatus = 'live';
+    } else if (ageMs <= LOCATION_STALE_MS) {
+      locationStatus = 'stale';
+    } else {
+      locationStatus = 'offline';
+    }
+
+    const statusConfig = {
+      live: { label: '● Live', className: 'text-xs text-green-200 animate-pulse' },
+      stale: { label: '● Stale', className: 'text-xs text-yellow-200' },
+      offline: { label: '● No Signal', className: 'text-xs text-red-200' },
+      unknown: { label: '● Waiting for GPS', className: 'text-xs text-blue-200' }
+    }[locationStatus];
+
+    const formatAge = () => {
+      if (!Number.isFinite(ageMs)) return 'No GPS update received';
+      if (ageMs < 1000) return 'Updated just now';
+      const seconds = Math.floor(ageMs / 1000);
+      if (seconds < 60) return `Updated ${seconds}s ago`;
+      const minutes = Math.floor(seconds / 60);
+      return `Updated ${minutes}m ${seconds % 60}s ago`;
+    };
+
+    if (!hasValidCoordinates) {
+      return (
+        <div className="p-4 rounded-lg border shadow-sm bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-white">Live Location (from Flutter)</h3>
+            <span className={statusConfig.className}>{statusConfig.label}</span>
+          </div>
+          <p className="text-xs text-blue-200 mt-3">Waiting for the driver app to send a valid GPS location.</p>
+          {timestampValue && (
+            <p className="text-xs text-blue-200 mt-2">Last data update: {new Date(timestampValue).toLocaleString()}</p>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="p-4 rounded-lg border shadow-sm bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-white"> Live Location (from Flutter)</h3>
-          <span className="text-xs text-blue-200 animate-pulse">● Live</span>
+          <h3 className="text-sm font-medium text-white">Live Location (from Flutter)</h3>
+          <span className={statusConfig.className}>{statusConfig.label}</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
           <div>
             <p className="text-xs text-blue-200">Latitude</p>
-            <p className="text-sm font-medium text-white">{driver.latitude}</p>
+            <p className="text-sm font-medium text-white">{latitude.toFixed(6)}</p>
           </div>
           <div>
             <p className="text-xs text-blue-200">Longitude</p>
-            <p className="text-sm font-medium text-white">{driver.longitude}</p>
+            <p className="text-sm font-medium text-white">{longitude.toFixed(6)}</p>
           </div>
-          {driver.speed !== undefined && (
+          {driver?.speed !== undefined && (
             <div>
               <p className="text-xs text-blue-200">Speed</p>
-              <p className="text-sm font-medium text-white">{driver.speed} km/h</p>
+              <p className="text-sm font-medium text-white">{Number(driver.speed).toFixed(1)} km/h</p>
             </div>
           )}
-          {driver.heading !== undefined && (
+          {driver?.heading !== undefined && (
             <div>
               <p className="text-xs text-blue-200">Heading</p>
-              <p className="text-sm font-medium text-white">{driver.heading}°</p>
+              <p className="text-sm font-medium text-white">{Number(driver.heading).toFixed(1)}°</p>
             </div>
           )}
         </div>
-        {driver.lastUpdate && (
-          <p className="text-xs text-blue-200 mt-3"> Last update: {new Date(driver.lastUpdate).toLocaleString()}</p>
+        <p className="text-xs text-blue-200 mt-3">{formatAge()}</p>
+        {timestampValue && (
+          <p className="text-xs text-blue-200 mt-1">Last GPS update: {new Date(timestampValue).toLocaleString()}</p>
         )}
       </div>
     );
-  }, [driver?.latitude, driver?.longitude, driver?.speed, driver?.heading, driver?.lastUpdate]);
+  }, [driver?.latitude, driver?.longitude, driver?.lat, driver?.lng, driver?.speed, driver?.heading, driver?.lastUpdate, driver?.locationUpdatedAt, driver?.lastLocationUpdate, locationNow]);
 
   // RealTimeStatusIndicator
   const RealTimeStatusIndicator = () => (
@@ -1702,7 +1950,7 @@ export default function EditDriver() {
                 <span className={`font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                   {formData.isOnline ? '🟢 Online' : '⚪ Offline'}
                 </span>
-                <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'} ml-2`}>(Live from driver app)</span>
+                <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'} ml-2`}>(Synced from driver app)</span>
               </div>
               {formData.isOnline ? (
                 <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>Online for: <span className="font-medium text-green-600">{getOnlineDuration()}</span></span>
@@ -1723,7 +1971,7 @@ export default function EditDriver() {
               >
                 {updatingStatus ? (
                   <span className="flex items-center space-x-2">
-                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-4 w-4" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -1754,9 +2002,9 @@ export default function EditDriver() {
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
                       </div>
                     ) : photoPreview ? (
-                      <img 
-                        src={photoPreview} 
-                        alt={`${driver.name}'s profile`} 
+                      <img
+                        src={photoPreview}
+                        alt={`${driver.name}'s profile`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -1890,9 +2138,9 @@ export default function EditDriver() {
                     <p className={`text-sm font-mono ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>{driver.id.slice(0, 12)}...</p>
                   </div>
                 </div>
-                
+               
                 {/* ✅ Large Star Rating Display with Sentiment Breakdown */}
-                <div className="mt-4 pt-4 border-t ${userBackground === 'dark' ? 'border-gray-600' : 'border-gray-200'}">
+                <div className={`mt-4 pt-4 border-t ${userBackground === 'dark' ? 'border-gray-600' : 'border-gray-200'}`}>
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center space-x-4">
                       <div>
@@ -1924,7 +2172,7 @@ export default function EditDriver() {
                       )}
                     </div>
                   </div>
-                  
+                 
                   {/* ✅ Sentiment Breakdown - Shows positive, negative, moderate feedback counts */}
                   {(driver.sentimentPositive > 0 || driver.sentimentNegative > 0 || driver.sentimentModerate > 0) && (
                     <div className="mt-3">
@@ -1974,8 +2222,8 @@ export default function EditDriver() {
                 {driver.fuelHistory && driver.fuelHistory.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
-                      Last top-up: {driver.fuelHistory[driver.fuelHistory.length - 1]?.timestamp 
-                        ? new Date(driver.fuelHistory[driver.fuelHistory.length - 1].timestamp).toLocaleString() 
+                      Last top-up: {driver.fuelHistory[driver.fuelHistory.length - 1]?.timestamp
+                        ? new Date(driver.fuelHistory[driver.fuelHistory.length - 1].timestamp).toLocaleString()
                         : 'N/A'}
                     </p>
                   </div>
@@ -2064,7 +2312,7 @@ export default function EditDriver() {
                   </svg>
                 </button>
               </div>
-              
+             
               <div className={`mb-4 p-3 rounded-md border ${hasExistingPassword ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
                 <p className={`text-sm ${hasExistingPassword ? 'text-yellow-700' : 'text-green-700'}`}>
                   <strong>Note:</strong> {hasExistingPassword ? 'This will update the driver\'s password in Firebase Auth.' : 'This will create a driver account with UID as document ID.'}
@@ -2087,7 +2335,7 @@ export default function EditDriver() {
                 <div>
                   <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Confirm New Password *</label>
                   <input type="password" name="confirmPassword" value={passwordData.confirmPassword} onChange={handlePasswordChange} required className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`} placeholder="Confirm new password" />
-                  {passwordData.newPassword && passwordData.confirmPassword && 
+                  {passwordData.newPassword && passwordData.confirmPassword &&
                    passwordData.newPassword !== passwordData.confirmPassword && (
                     <p className="text-xs text-red-500 mt-1">⚠️ Passwords do not match</p>
                   )}
@@ -2097,7 +2345,7 @@ export default function EditDriver() {
                   <button type="submit" disabled={updatingPassword} className={`px-6 py-2 text-sm font-bold text-white rounded-lg transition disabled:opacity-50 ${hasExistingPassword ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600 animate-pulse'}`}>
                     {updatingPassword ? (
                       <span className="flex items-center space-x-2">
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -2140,10 +2388,10 @@ export default function EditDriver() {
               <form onSubmit={handleFuelTopUp} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type *</label>
-                  <select 
-                    name="fuelType" 
-                    value={fuelData.fuelType} 
-                    onChange={handleFuelChange} 
+                  <select
+                    name="fuelType"
+                    value={fuelData.fuelType}
+                    onChange={handleFuelChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="Petrol">Petrol</option>
@@ -2159,17 +2407,17 @@ export default function EditDriver() {
                       (Max: {mainTankStock[fuelData.fuelType]?.toFixed(1) || 0}L available)
                     </span>
                   </label>
-                  <input 
-                    type="number" 
-                    name="amount" 
-                    value={fuelData.amount || ''} 
-                    onChange={handleFuelChange} 
-                    required 
-                    min="1" 
-                    step="0.1" 
+                  <input
+                    type="number"
+                    name="amount"
+                    value={fuelData.amount || ''}
+                    onChange={handleFuelChange}
+                    required
+                    min="1"
+                    step="0.1"
                     max={mainTankStock[fuelData.fuelType] || 0}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" 
-                    placeholder="Enter amount in litres" 
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Enter amount in litres"
                   />
                   {mainTankStock[fuelData.fuelType] === 0 && (
                     <p className="text-xs text-red-500 mt-1 font-bold animate-pulse">
@@ -2193,12 +2441,12 @@ export default function EditDriver() {
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">
                   <button type="button" onClick={() => setShowFuelModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Cancel</button>
-                  <button 
-                    type="submit" 
-                    disabled={updatingFuel || !fuelData.amount || fuelData.amount > (mainTankStock[fuelData.fuelType] || 0) || mainTankStock[fuelData.fuelType] === 0} 
+                  <button
+                    type="submit"
+                    disabled={updatingFuel || !fuelData.amount || fuelData.amount > (mainTankStock[fuelData.fuelType] || 0) || mainTankStock[fuelData.fuelType] === 0}
                     className={`px-6 py-2 text-sm font-bold text-white rounded-lg transition disabled:opacity-50 ${
                       fuelData.amount > (mainTankStock[fuelData.fuelType] || 0) || mainTankStock[fuelData.fuelType] === 0
-                        ? 'bg-red-500 cursor-not-allowed' 
+                        ? 'bg-red-500 cursor-not-allowed'
                         : 'bg-green-500 hover:bg-green-600'
                     }`}
                   >
@@ -2222,7 +2470,7 @@ export default function EditDriver() {
                   </svg>
                 </button>
               </div>
-              
+             
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                 <p className="text-sm text-red-700"><strong>⚠️ Warning:</strong> This action cannot be undone!</p>
                 <p className="text-sm text-gray-600 mt-2">You are about to delete driver: <strong>{driver?.name}</strong></p>

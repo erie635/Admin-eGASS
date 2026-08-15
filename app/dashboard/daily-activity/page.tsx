@@ -2,26 +2,26 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../../../lib/firebase';
-import { collection, getDocs, query, where, orderBy, onSnapshot, doc, updateDoc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  runTransaction,
+  serverTimestamp,
+} from 'firebase/firestore';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
-// Generate a unique driver ID
-const generateDriverId = (driverName: string) => {
-  const namePrefix = driverName.substring(0, 3).toUpperCase();
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let randomPart = '';
-  for (let i = 0; i < 6; i++) {
-    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  const timestamp = Date.now().toString();
-  const timePart = timestamp.slice(-3);
-  return `${namePrefix}${randomPart}${timePart}`;
-};
-
 interface DailyActivity {
   id: string;
+  // Internal Firebase ID - KEEP THIS FOR DATABASE RELATIONSHIPS
   driverId: string;
+  // Public/custom driver ID - DISPLAY THIS IN THE UI
+  driverCode?: string;
   driverName: string;
   numberPlate?: string;
   date: string;
@@ -32,12 +32,9 @@ interface DailyActivity {
   offlineStart?: any;
   lastOnlineTime?: any;
   lastOfflineTime?: any;
-  totalHours?: number;
-  totalMinutesDisplay?: number;
   totalMinutes?: number;
-  totalOfflineHours?: number;
   totalOfflineMinutes?: number;
-  totalOfflineMinutesCumulative?: number;
+  lastAccumulatedAt?: any;
   onlineSessions?: number;
   offlineSessions?: number;
   totalSwitches?: number;
@@ -103,14 +100,134 @@ export default function DailyActivityPage() {
   const [userBackground, setUserBackground] = useState('white');
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
-  
+
   // Use refs for component lifecycle management
   const isMountedRef = useRef(true);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const driverUnsubscribeRef = useRef<(() => void) | null>(null);
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch user background
+  // ============================================================
+  // DRIVER CODE CONFIGURATION
+  // ============================================================
+  const DRIVER_CODE_PREFIX = 'EGD';
+
+  /**
+   * Creates the public driver code.
+   */
+  const createDriverCode = (number: number): string => {
+    return `${DRIVER_CODE_PREFIX}-${String(number).padStart(5, '0')}`;
+  };
+
+  /**
+   * Get an existing custom driver code from the driver document.
+   */
+  const getExistingDriverCode = (driverData: any): string | null => {
+    const possibleCode =
+      driverData?.driverCode ||
+      driverData?.customDriverId ||
+      driverData?.driverNumber;
+
+    if (
+      typeof possibleCode === 'string' &&
+      possibleCode.trim().length > 0
+    ) {
+      return possibleCode.trim();
+    }
+
+    return null;
+  };
+
+  /**
+   * Ensure every driver has a permanent public driver code with retry logic
+   */
+  const ensureDriverCode = async (
+    driverId: string,
+    driverData: any,
+    retryCount: number = 0
+  ): Promise<string> => {
+    const existingCode = getExistingDriverCode(driverData);
+
+    if (existingCode) {
+      return existingCode;
+    }
+
+    const driverRef = doc(db, 'drivers', driverId);
+    const sequenceRef = doc(db, 'systemSequences', 'driverCodes');
+
+    try {
+      const assignedCode = await runTransaction(
+        db,
+        async (transaction) => {
+          const currentDriverSnapshot = await transaction.get(driverRef);
+          const currentDriverData = currentDriverSnapshot.exists()
+            ? currentDriverSnapshot.data()
+            : {};
+
+          const codeAlreadyExists = getExistingDriverCode(currentDriverData);
+
+          if (codeAlreadyExists) {
+            return codeAlreadyExists;
+          }
+
+          const sequenceSnapshot = await transaction.get(sequenceRef);
+          let nextNumber = 1;
+
+          if (sequenceSnapshot.exists()) {
+            const sequenceData = sequenceSnapshot.data();
+            if (
+              typeof sequenceData.nextNumber === 'number' &&
+              sequenceData.nextNumber > 0
+            ) {
+              nextNumber = sequenceData.nextNumber;
+            }
+          }
+
+          const newDriverCode = createDriverCode(nextNumber);
+
+          transaction.set(
+            driverRef,
+            {
+              driverCode: newDriverCode,
+              driverCodeCreatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+
+          transaction.set(
+            sequenceRef,
+            {
+              nextNumber: nextNumber + 1,
+              lastAssignedCode: newDriverCode,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+
+          return newDriverCode;
+        }
+      );
+
+      return assignedCode;
+    } catch (error: any) {
+      // If it's a transaction conflict, retry up to 3 times
+      if (
+        error.code === 'failed-precondition' &&
+        retryCount < 3
+      ) {
+        console.log(`Retrying ensureDriverCode (attempt ${retryCount + 1})...`);
+        await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1)));
+        return ensureDriverCode(driverId, driverData, retryCount + 1);
+      }
+
+      console.error('Error creating public driver code:', error);
+      return 'PENDING';
+    }
+  };
+
+  // ============================================================
+  // FETCH USER BACKGROUND
+  // ============================================================
+
   useEffect(() => {
     const fetchUserBackground = async () => {
       const currentUser = auth.currentUser;
@@ -132,7 +249,10 @@ export default function DailyActivityPage() {
     fetchUserBackground();
   }, []);
 
-  // Update current time every 5 seconds for real-time duration calculations
+  // ============================================================
+  // REAL-TIME CLOCK
+  // ============================================================
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (isMountedRef.current) {
@@ -145,7 +265,10 @@ export default function DailyActivityPage() {
     };
   }, []);
 
-  // Get background class based on user preference
+  // ============================================================
+  // BACKGROUND
+  // ============================================================
+
   const getBackgroundClass = () => {
     switch (userBackground) {
       case 'dark':
@@ -159,7 +282,10 @@ export default function DailyActivityPage() {
     }
   };
 
-  // Get card class based on user preference
+  // ============================================================
+  // CARD
+  // ============================================================
+
   const getCardClass = () => {
     switch (userBackground) {
       case 'dark':
@@ -173,61 +299,10 @@ export default function DailyActivityPage() {
     }
   };
 
-  // Safe update function using setDoc with merge
-  const safeUpdateOrCreateActivity = async (docId: string, updateData: any) => {
-    try {
-      const docRef = doc(db, 'driverDailyActivity', docId);
-      // Use setDoc with merge to either create or update
-      await setDoc(docRef, updateData, { merge: true });
-      return true;
-    } catch (error) {
-      console.error('Error updating/creating document:', error);
-      return false;
-    }
-  };
+  // ============================================================
+  // TIMESTAMP HELPERS
+  // ============================================================
 
-  // Calculate hours worked for a driver in real-time
-  const calculateDriverHours = (activity: DailyActivity): { hours: number; minutes: number } => {
-    let totalMinutes = 0;
-    const now = currentTime;
-
-    try {
-      // If driver is currently online, calculate from onlineStart to now
-      if (activity.isOnline && activity.onlineStart) {
-        const start = activity.onlineStart.toDate ? activity.onlineStart.toDate() : new Date(activity.onlineStart);
-        const diffMs = now.getTime() - start.getTime();
-        if (diffMs > 0) {
-          totalMinutes += Math.floor(diffMs / 60000);
-        }
-      }
-
-      // Add any stored offline time (if available)
-      if (activity.totalOfflineMinutesCumulative) {
-        totalMinutes += activity.totalOfflineMinutesCumulative;
-      }
-
-      // If we have totalMinutes stored, use that as base
-      if (activity.totalMinutes) {
-        totalMinutes = Math.max(totalMinutes, activity.totalMinutes);
-      }
-
-      // If we have totalHours and totalMinutesDisplay stored, use those
-      if (activity.totalHours !== undefined && activity.totalMinutesDisplay !== undefined) {
-        const storedMinutes = (activity.totalHours * 60) + activity.totalMinutesDisplay;
-        totalMinutes = Math.max(totalMinutes, storedMinutes);
-      }
-
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-
-      return { hours, minutes };
-    } catch (error) {
-      console.error('Error calculating driver hours:', error);
-      return { hours: 0, minutes: 0 };
-    }
-  };
-
-  // Helper function to safely get timestamp
   const getTimestamp = (value: any): Date | null => {
     if (!value) return null;
     try {
@@ -240,266 +315,451 @@ export default function DailyActivityPage() {
     }
   };
 
-  // Helper function to get server timestamp or current time
   const getServerTimestamp = () => {
     return serverTimestamp();
   };
 
-  // Setup real-time driver status listener with server timestamps
+  // ============================================================
+  // DRIVER HOURS (DISPLAY FIX - SHOW ENTIRE DAY'S ACCUMULATED TIME)
+  // ============================================================
+
+  const calculateDriverHours = (
+    activity: DailyActivity
+  ): { hours: number; minutes: number } => {
+    let totalMinutes = Math.max(0, activity.totalMinutes || 0);
+    const now = currentTime;
+
+    try {
+      // totalMinutes is persisted by the listener. If the driver is currently
+      // online, only show the small amount since the last persisted checkpoint.
+      if (activity.isOnline) {
+        const checkpoint = getTimestamp(activity.lastAccumulatedAt);
+        const start = checkpoint || getTimestamp(activity.onlineStart);
+        if (start) {
+          const diffMs = now.getTime() - start.getTime();
+          if (diffMs > 0) {
+            totalMinutes += Math.floor(diffMs / 60000);
+          }
+        }
+      }
+
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return { hours, minutes };
+    } catch (error) {
+      console.error('Error calculating driver hours:', error);
+      return { hours: 0, minutes: 0 };
+    }
+  };
+
+  // ============================================================
+  // OFFLINE DURATION - TOTAL OFFLINE TIME ACCUMULATED TODAY
+  // This shows the TOTAL offline time from midnight to now
+  // ============================================================
+
+  const calculateOfflineDuration = (
+    activity: DailyActivity
+  ): string => {
+    // Get the base offline minutes from the activity record
+    // This is the accumulated offline time saved in Firestore
+    let totalOfflineMinutes = Math.max(0, activity.totalOfflineMinutes || 0);
+    const now = currentTime;
+
+    try {
+      // If the driver is currently offline, we need to add the time since
+      // the last checkpoint to get the TOTAL offline time today
+      if (!activity.isOnline) {
+        // Get the checkpoint (when we last saved) or the offline start time
+        const checkpoint = getTimestamp(activity.lastAccumulatedAt);
+        const offlineStart = getTimestamp(activity.offlineStart);
+        
+        // Use checkpoint if available, otherwise use offlineStart
+        const start = checkpoint || offlineStart;
+        
+        if (start) {
+          const diffMs = now.getTime() - start.getTime();
+          if (diffMs > 0) {
+            // Add the additional minutes since the last checkpoint
+            // This gives us the TOTAL offline time from midnight to now
+            const additionalMinutes = Math.floor(diffMs / 60000);
+            totalOfflineMinutes += additionalMinutes;
+          }
+        }
+      }
+
+      // Format the total offline minutes as hours and minutes
+      const hours = Math.floor(totalOfflineMinutes / 60);
+      const minutes = totalOfflineMinutes % 60;
+      
+      // Return in a consistent format
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    } catch (error) {
+      console.error('Error calculating offline duration:', error);
+      return '0h 0m';
+    }
+  };
+
+  // ============================================================
+  // DRIVER STATUS LISTENER WITH RETRY LOGIC & PERMANENT BACKFILL
+  // ============================================================
+
+  /**
+   * Resolve a real status-change timestamp when the driver document provides one.
+   * The listener falls back to the moment it first observes the current state.
+   * It never invents a midnight start time.
+   */
+  const getDriverStatusStart = (
+    driverData: any,
+    isOnline: boolean,
+    fallback: Date,
+    todayStr: string
+  ): Date => {
+    const candidates = isOnline
+      ? [
+          driverData?.onlineSince,
+          driverData?.onlineStart,
+          driverData?.lastOnlineTime,
+          driverData?.statusChangedAt,
+        ]
+      : [
+          driverData?.offlineSince,
+          driverData?.offlineStart,
+          driverData?.lastOfflineTime,
+          driverData?.statusChangedAt,
+        ];
+
+    for (const candidate of candidates) {
+      const parsed = getTimestamp(candidate);
+      if (
+        parsed &&
+        parsed.getTime() <= fallback.getTime() &&
+        parsed.toISOString().split('T')[0] === todayStr
+      ) {
+        return parsed;
+      }
+    }
+
+    return fallback;
+  };
+
+  // Get the midnight timestamp for today
+  const getMidnightToday = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day, 0, 0, 0, 0);
+  };
+
+  // Persist the active session at least once per minute. This means the daily
+  // record keeps accumulating even if the driver never changes status again.
+  const accumulateCurrentSession = (
+    current: any,
+    isOnline: boolean,
+    now: Date,
+    updateData: any
+  ) => {
+    const currentTotalOnline = Math.max(0, current.totalMinutes || 0);
+    const currentTotalOffline = Math.max(0, current.totalOfflineMinutes || 0);
+    const checkpoint = getTimestamp(current.lastAccumulatedAt);
+
+    const fallbackStart = isOnline
+      ? getTimestamp(current.onlineStart)
+      : getTimestamp(current.offlineStart);
+
+    const start = checkpoint || fallbackStart;
+
+    if (!start) {
+      updateData.totalMinutes = currentTotalOnline;
+      updateData.totalOfflineMinutes = currentTotalOffline;
+      updateData.lastAccumulatedAt = now;
+      return;
+    }
+
+    const diffMs = now.getTime() - start.getTime();
+    const elapsedMinutes = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
+
+    if (isOnline) {
+      updateData.totalMinutes = currentTotalOnline + elapsedMinutes;
+      updateData.totalOfflineMinutes = currentTotalOffline;
+    } else {
+      updateData.totalMinutes = currentTotalOnline;
+      updateData.totalOfflineMinutes = currentTotalOffline + elapsedMinutes;
+    }
+
+    updateData.lastAccumulatedAt = now;
+  };
+
+  const processDriverTransaction = async (
+    driverId: string,
+    driverData: any,
+    isOnline: boolean,
+    todayStr: string,
+    now: Date,
+    retryCount: number = 0
+  ): Promise<void> => {
+    const activityDocId = `${driverId}_${todayStr}`;
+    const activityRef = doc(db, 'driverDailyActivity', activityDocId);
+    const driverRef = doc(db, 'drivers', driverId);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // All reads must happen before writes.
+        const activityDoc = await transaction.get(activityRef);
+        const activityData = activityDoc.exists() ? activityDoc.data() : null;
+        const driverSnapshot = await transaction.get(driverRef);
+        const latestDriverData = driverSnapshot.exists() ? driverSnapshot.data() : {};
+
+        const driverCode = getExistingDriverCode(latestDriverData) || 'PENDING';
+
+        const updateData: any = {
+          driverId,
+          driverCode,
+          driverName: latestDriverData.name || driverData.name || 'Unknown',
+          numberPlate: latestDriverData.numberPlate || driverData.numberPlate || '',
+          date: todayStr,
+          isOnline,
+          status: latestDriverData.status || driverData.status || 'offline',
+          isAvailable: latestDriverData.isAvailable ?? driverData.isAvailable ?? false,
+          lastUpdated: getServerTimestamp(),
+        };
+
+        // Location data
+        for (const key of ['latitude', 'longitude', 'speed', 'heading']) {
+          if (latestDriverData[key] !== undefined && latestDriverData[key] !== null) {
+            updateData[key] = latestDriverData[key];
+          } else if (driverData[key] !== undefined && driverData[key] !== null) {
+            updateData[key] = driverData[key];
+          }
+        }
+
+        // Fuel data
+        const fuelSource = latestDriverData.remainingFuel
+          ? latestDriverData
+          : driverData;
+        if (fuelSource.remainingFuel) updateData.remainingFuel = fuelSource.remainingFuel;
+        if (fuelSource.fuelAvailable) updateData.fuelAvailable = fuelSource.fuelAvailable;
+        if (fuelSource.hasFuel !== undefined && fuelSource.hasFuel !== null) {
+          updateData.hasFuel = fuelSource.hasFuel;
+        }
+
+        if (!activityData) {
+          // First observation of this driver for today.
+          // Get the status start time from the driver document or fallback to now
+          const statusStart = getDriverStatusStart(latestDriverData, isOnline, now, todayStr);
+          
+          // Calculate time from midnight to the status start time
+          const midnight = getMidnightToday(todayStr);
+          
+          // If the driver has been in this status since before midnight,
+          // we need to count time from midnight to now
+          let elapsedMinutesFromMidnight = 0;
+          const startTime = statusStart < midnight ? midnight : statusStart;
+          
+          // If the driver was already in this status at midnight, count from midnight
+          if (statusStart <= midnight) {
+            const diffMs = now.getTime() - midnight.getTime();
+            elapsedMinutesFromMidnight = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
+          } else {
+            // Driver came online/offline after midnight
+            const diffMs = now.getTime() - statusStart.getTime();
+            elapsedMinutesFromMidnight = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
+          }
+
+          updateData.onlineSessions = isOnline ? 1 : 0;
+          updateData.offlineSessions = isOnline ? 0 : 1;
+          updateData.totalSwitches = 0;
+          updateData.totalMinutes = 0;
+          updateData.totalOfflineMinutes = 0;
+          updateData.createdAt = getServerTimestamp();
+
+          if (isOnline) {
+            updateData.onlineStart = statusStart;
+            updateData.lastOnlineTime = statusStart;
+            updateData.offlineStart = null;
+            // Set total minutes to elapsed time from midnight or status start
+            updateData.totalMinutes = elapsedMinutesFromMidnight;
+            updateData.totalOfflineMinutes = 0;
+          } else {
+            updateData.offlineStart = statusStart;
+            updateData.lastOfflineTime = statusStart;
+            updateData.onlineStart = null;
+            // Set total offline minutes to elapsed time from midnight or status start
+            updateData.totalMinutes = 0;
+            updateData.totalOfflineMinutes = elapsedMinutesFromMidnight;
+          }
+
+          updateData.lastAccumulatedAt = now;
+          transaction.set(activityRef, updateData);
+          return;
+        }
+
+        const current = activityData;
+        const statusChanged = Boolean(current.isOnline) !== Boolean(isOnline);
+
+        if (statusChanged) {
+          if (isOnline) {
+            // OFFLINE -> ONLINE: close the offline session first.
+            const offlineStart = getTimestamp(current.offlineStart);
+            const offlineCheckpoint = getTimestamp(current.lastAccumulatedAt);
+            const offlineBase = offlineCheckpoint || offlineStart;
+            let offlineMinutes = current.totalOfflineMinutes || 0;
+
+            if (offlineBase) {
+              const diffMs = now.getTime() - offlineBase.getTime();
+              if (diffMs > 0) offlineMinutes += Math.floor(diffMs / 60000);
+            }
+
+            const statusStart = getDriverStatusStart(latestDriverData, true, now, todayStr);
+
+            updateData.totalMinutes = current.totalMinutes || 0;
+            updateData.totalOfflineMinutes = offlineMinutes;
+            updateData.onlineStart = statusStart;
+            updateData.lastOnlineTime = statusStart;
+            updateData.offlineStart = null;
+            updateData.lastAccumulatedAt = now;
+            updateData.onlineSessions = (current.onlineSessions || 0) + 1;
+            updateData.offlineSessions = current.offlineSessions || 0;
+            updateData.totalSwitches = (current.totalSwitches || 0) + 1;
+          } else {
+            // ONLINE -> OFFLINE: close the online session first.
+            const onlineStart = getTimestamp(current.onlineStart);
+            const onlineCheckpoint = getTimestamp(current.lastAccumulatedAt);
+            const onlineBase = onlineCheckpoint || onlineStart;
+            let onlineMinutes = current.totalMinutes || 0;
+
+            if (onlineBase) {
+              const diffMs = now.getTime() - onlineBase.getTime();
+              if (diffMs > 0) onlineMinutes += Math.floor(diffMs / 60000);
+            }
+
+            const statusStart = getDriverStatusStart(latestDriverData, false, now, todayStr);
+
+            updateData.totalMinutes = onlineMinutes;
+            updateData.totalOfflineMinutes = current.totalOfflineMinutes || 0;
+            updateData.offlineStart = statusStart;
+            updateData.lastOfflineTime = statusStart;
+            updateData.onlineStart = null;
+            updateData.lastAccumulatedAt = now;
+            updateData.offlineSessions = (current.offlineSessions || 0) + 1;
+            updateData.onlineSessions = current.onlineSessions || 0;
+            updateData.totalSwitches = (current.totalSwitches || 0) + 1;
+          }
+        } else {
+          // Status did not change. Persist the elapsed minutes since the last
+          // checkpoint so an online driver who stays online all day is still
+          // recorded every reconciliation cycle.
+          updateData.onlineStart = current.onlineStart;
+          updateData.offlineStart = current.offlineStart;
+          updateData.lastOnlineTime = current.lastOnlineTime;
+          updateData.lastOfflineTime = current.lastOfflineTime;
+          updateData.onlineSessions = current.onlineSessions || 0;
+          updateData.offlineSessions = current.offlineSessions || 0;
+          updateData.totalSwitches = current.totalSwitches || 0;
+          accumulateCurrentSession(current, isOnline, now, updateData);
+        }
+
+        Object.keys(updateData).forEach((key) => {
+          if (updateData[key] === undefined) delete updateData[key];
+        });
+
+        transaction.set(activityRef, updateData, { merge: true });
+      });
+
+      if (isMountedRef.current) {
+        setLastSyncTime(new Date());
+        setLastRefreshTime(new Date());
+      }
+    } catch (error: any) {
+      if (error.code === 'failed-precondition' && retryCount < 3) {
+        await new Promise(resolve => setTimeout(resolve, 200 * (retryCount + 1)));
+        return processDriverTransaction(driverId, driverData, isOnline, todayStr, now, retryCount + 1);
+      }
+
+      if (error.code === 'unavailable' && isMountedRef.current) {
+        console.warn('Firestore connection dropped. Listeners will retry through Firestore.');
+      }
+
+      console.error('Error in transaction for driver:', driverId, error);
+    }
+  };
+
   const setupDriverStatusListener = () => {
     if (driverUnsubscribeRef.current) {
       driverUnsubscribeRef.current();
       driverUnsubscribeRef.current = null;
     }
 
-    // Listen to all drivers for real-time status changes
     const driversQuery = collection(db, 'drivers');
-    
-    driverUnsubscribeRef.current = onSnapshot(driversQuery, async (snapshot) => {
-      // Skip if component unmounted
+
+    const processAllDrivers = async (snapshot: any) => {
       if (!isMountedRef.current) return;
 
       const now = new Date();
       const todayStr = now.toISOString().split('T')[0];
-
-      // Only process if we're looking at today's data
       if (selectedDate !== todayStr) return;
 
-      // Load all today's activities once into a map
-      const activityMap = new Map();
-      try {
-        const todayActivities = await getDocs(
-          query(
-            collection(db, 'driverDailyActivity'),
-            where('date', '==', todayStr)
-          )
-        );
-        todayActivities.forEach((docSnap) => {
-          const data = docSnap.data();
-          activityMap.set(data.driverId, {
-            id: docSnap.id,
-            ...data,
-          });
-        });
-      } catch (error) {
-        console.error('Error fetching today activities:', error);
-        return;
-      }
+      // Check every driver, not only changed drivers. The first snapshot also
+      // creates today's record for every driver in the database.
+      for (const driverDoc of snapshot.docs) {
+        if (!isMountedRef.current) return;
 
-      let updatesFound = 0;
-      const batchUpdates: { docId: string; data: any }[] = [];
-
-      // Process each driver that changed
-      for (const docChange of snapshot.docChanges()) {
-        // Skip removed documents
-        if (docChange.type === 'removed') {
-          continue;
-        }
-
-        const driverData = docChange.doc.data();
-        const driverId = docChange.doc.id;
-
-        // Skip if driver has no name
+        const driverData = driverDoc.data();
+        const driverId = driverDoc.id;
         if (!driverData.name) continue;
 
-        // Ensure isOnline is a boolean
-        const isOnline = driverData.isOnline ?? false;
+        const isOnline = Boolean(driverData.isOnline ?? false);
 
-        // Use the cached activity map instead of querying
-        const existingActivity = activityMap.get(driverId);
-
-        // Build update data with only defined values
-        const updateData: any = {
-          driverId: driverId,
-          driverName: driverData.name || 'Unknown',
-          numberPlate: driverData.numberPlate || '',
-          date: todayStr,
-          isOnline: isOnline,
-          status: driverData.status || 'offline',
-          isAvailable: driverData.isAvailable ?? false,
-          lastUpdated: getServerTimestamp(),
-        };
-
-        // Only set timestamps when status actually changes
-        if (!existingActivity) {
-          // First record ever - initialize timestamps with server timestamps
-          if (isOnline) {
-            updateData.onlineStart = getServerTimestamp();
-            updateData.lastOnlineTime = getServerTimestamp();
-            updateData.onlineSessions = 1;
-            updateData.offlineSessions = 0;
-          } else {
-            updateData.offlineStart = getServerTimestamp();
-            updateData.lastOfflineTime = getServerTimestamp();
-            updateData.onlineSessions = 0;
-            updateData.offlineSessions = 1;
-          }
-          updateData.totalSwitches = 0;
-          updateData.totalHours = 0;
-          updateData.totalMinutes = 0;
-          updateData.totalMinutesDisplay = 0;
-          updateData.createdAt = getServerTimestamp();
-
-          batchUpdates.push({ docId: `${driverId}_${todayStr}`, data: updateData });
-          updatesFound++;
-        } else {
-          // Use existingActivity data
-          const current = existingActivity;
-
-          // Only update timestamps if status actually changed
-          if (current.isOnline !== isOnline) {
-            if (isOnline) {
-              // Driver went offline -> online
-              updateData.onlineStart = getServerTimestamp();
-              updateData.lastOnlineTime = getServerTimestamp();
-              // Preserve offline start
-              updateData.offlineStart = current.offlineStart || null;
-              // Increment online sessions and switches
-              updateData.onlineSessions = (current.onlineSessions || 0) + 1;
-              updateData.totalSwitches = (current.totalSwitches || 0) + 1;
-              // Preserve offline sessions
-              updateData.offlineSessions = current.offlineSessions || 0;
-            } else {
-              // Driver went online -> offline
-              // Calculate how long they were online
-              if (current.onlineStart) {
-                const start = getTimestamp(current.onlineStart);
-                if (start) {
-                  const nowDate = new Date();
-                  const diffMs = nowDate.getTime() - start.getTime();
-                  if (diffMs > 0) {
-                    const minutesWorked = Math.floor(diffMs / 60000);
-                    const currentTotalMinutes = (current.totalMinutes || 0) + minutesWorked;
-                    updateData.totalMinutes = currentTotalMinutes;
-                    updateData.totalHours = Math.floor(currentTotalMinutes / 60);
-                    updateData.totalMinutesDisplay = currentTotalMinutes % 60;
-                  }
-                }
-              }
-              updateData.offlineStart = getServerTimestamp();
-              updateData.lastOfflineTime = getServerTimestamp();
-              // Preserve online start
-              updateData.onlineStart = current.onlineStart || null;
-              // Increment offline sessions and switches
-              updateData.offlineSessions = (current.offlineSessions || 0) + 1;
-              updateData.totalSwitches = (current.totalSwitches || 0) + 1;
-              // Preserve online sessions
-              updateData.onlineSessions = current.onlineSessions || 0;
-            }
-          } else {
-            // Status didn't change - preserve existing timestamps
-            updateData.onlineStart = current.onlineStart;
-            updateData.offlineStart = current.offlineStart;
-            updateData.onlineSessions = current.onlineSessions || 0;
-            updateData.offlineSessions = current.offlineSessions || 0;
-            updateData.totalSwitches = current.totalSwitches || 0;
-            updateData.totalHours = current.totalHours || 0;
-            updateData.totalMinutes = current.totalMinutes || 0;
-            updateData.totalMinutesDisplay = current.totalMinutesDisplay || 0;
-          }
-        }
-
-        // Only add location data if it exists and is not undefined or null
-        if (driverData.latitude !== undefined && driverData.latitude !== null) {
-          updateData.latitude = driverData.latitude;
-        }
-        if (driverData.longitude !== undefined && driverData.longitude !== null) {
-          updateData.longitude = driverData.longitude;
-        }
-        if (driverData.speed !== undefined && driverData.speed !== null) {
-          updateData.speed = driverData.speed;
-        }
-        if (driverData.heading !== undefined && driverData.heading !== null) {
-          updateData.heading = driverData.heading;
-        }
-
-        // Only add fuel data if it exists
-        if (driverData.remainingFuel) {
-          updateData.remainingFuel = driverData.remainingFuel;
-        }
-        if (driverData.fuelAvailable) {
-          updateData.fuelAvailable = driverData.fuelAvailable;
-        }
-        if (driverData.hasFuel !== undefined && driverData.hasFuel !== null) {
-          updateData.hasFuel = driverData.hasFuel;
-        }
-
-        // Remove any undefined or null values from updateData
-        Object.keys(updateData).forEach(key => {
-          if (updateData[key] === undefined || updateData[key] === null) {
-            delete updateData[key];
-          }
+        ensureDriverCode(driverId, driverData).catch((error) => {
+          console.error('Error ensuring driver code:', error);
         });
 
-        if (existingActivity) {
-          // Document exists - check for actual changes
-          const docId = existingActivity.id;
-          
-          // Check for status changes
-          const statusChanged = existingActivity.isOnline !== updateData.isOnline;
-          
-          // Check for other changes
-          const hasChanges = statusChanged ||
-            existingActivity.status !== updateData.status ||
-            existingActivity.latitude !== updateData.latitude ||
-            existingActivity.longitude !== updateData.longitude ||
-            existingActivity.speed !== updateData.speed ||
-            existingActivity.heading !== updateData.heading ||
-            existingActivity.onlineSessions !== updateData.onlineSessions ||
-            existingActivity.offlineSessions !== updateData.offlineSessions ||
-            existingActivity.totalSwitches !== updateData.totalSwitches ||
-            existingActivity.totalHours !== updateData.totalHours ||
-            existingActivity.totalMinutesDisplay !== updateData.totalMinutesDisplay ||
-            existingActivity.totalMinutes !== updateData.totalMinutes;
-
-          if (statusChanged) {
-            updatesFound++;
-          }
-
-          // Only write if something actually changed
-          if (hasChanges) {
-            batchUpdates.push({ docId, data: updateData });
-          }
-        } else {
-          // Document doesn't exist - create it
-          const docId = `${driverId}_${todayStr}`;
-          batchUpdates.push({ docId, data: updateData });
-          updatesFound++;
-        }
+        await processDriverTransaction(
+          driverId,
+          driverData,
+          isOnline,
+          todayStr,
+          now
+        );
       }
+    };
 
-      // Process batch updates with throttling
-      if (batchUpdates.length > 0) {
-        // Clear any pending timeout
-        if (updateTimeoutRef.current) {
-          clearTimeout(updateTimeoutRef.current);
-        }
-
-        // Throttle updates to prevent excessive writes
-        updateTimeoutRef.current = setTimeout(async () => {
-          let successCount = 0;
-          for (const batch of batchUpdates) {
-            const success = await safeUpdateOrCreateActivity(batch.docId, batch.data);
-            if (success) successCount++;
-          }
-          
-          if (successCount > 0 && isMountedRef.current) {
-            setLastSyncTime(new Date());
-            setLastRefreshTime(new Date());
-            console.log(`✅ Updated ${successCount} driver activities`);
-          }
-          
-          updateTimeoutRef.current = null;
-        }, 500); // 500ms throttle
+    driverUnsubscribeRef.current = onSnapshot(
+      driversQuery,
+      async (snapshot) => {
+        // Every Firestore snapshot is a full driver-state reconciliation.
+        // This means an existing online driver is checked even if they have
+        // not changed status since the previous snapshot.
+        await processAllDrivers(snapshot);
+      },
+      (error) => {
+        console.error('Error listening to driver status changes:', error);
       }
+    );
 
-    }, (error) => {
-      console.error('Error listening to driver status changes:', error);
-      // Don't show toast for every error to avoid spam
-    });
+    // Reconcile every driver once per minute. This persists the active session
+    // even when the driver remains online/offline without changing status.
+    const intervalId = window.setInterval(async () => {
+      try {
+        if (!isMountedRef.current || selectedDate !== new Date().toISOString().split('T')[0]) return;
+        const snapshot = await getDocs(driversQuery);
+        await processAllDrivers(snapshot);
+      } catch (error) {
+        console.error('Error during daily driver reconciliation:', error);
+      }
+    }, 60000);
+
+    const originalUnsubscribe = driverUnsubscribeRef.current;
+    driverUnsubscribeRef.current = () => {
+      originalUnsubscribe?.();
+      window.clearInterval(intervalId);
+    };
   };
 
-  // Setup listener function for daily activities
+  // ============================================================
+  // DAILY ACTIVITY LISTENER
+  // ============================================================
+
   const setupListener = () => {
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
@@ -513,96 +773,97 @@ export default function DailyActivityPage() {
       where('date', '==', selectedDate)
     );
 
-    unsubscribeRef.current = onSnapshot(q, async (snapshot) => {
-      // Skip if component unmounted
-      if (!isMountedRef.current) return;
+    unsubscribeRef.current = onSnapshot(
+      q,
+      async (snapshot) => {
+        if (!isMountedRef.current) return;
 
-      // ✅ FIX: Get all valid driver IDs from the drivers collection
-      let validDriverIds = new Set<string>();
-      try {
-        const driversSnapshot = await getDocs(collection(db, 'drivers'));
-        driversSnapshot.docs.forEach(doc => {
-          validDriverIds.add(doc.id);
-        });
-      } catch (error) {
-        console.error('Error fetching drivers for validation:', error);
-        // If we can't fetch drivers, show all activities (fallback)
-        validDriverIds = new Set();
-      }
+        // Get valid Firebase driver IDs
+        let validDriverIds = new Set<string>();
 
-      const activitiesData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let customDriverId = data.driverId;
-        if (!customDriverId || /^[a-zA-Z0-9]{20,}$/.test(customDriverId)) {
-          customDriverId = data.driverName ? generateDriverId(data.driverName) : `DRV${Date.now().toString().slice(-6)}`;
+        try {
+          const driversSnapshot = await getDocs(collection(db, 'drivers'));
+          driversSnapshot.docs.forEach((driverDoc) => {
+            validDriverIds.add(driverDoc.id);
+          });
+        } catch (error) {
+          console.error('Error fetching drivers for validation:', error);
+          validDriverIds = new Set();
         }
-        return {
-          id: doc.id,
-          ...data,
-          driverId: customDriverId,
-          isOnline: data.isOnline ?? false,
-          isAvailable: data.isAvailable ?? false,
-        };
-      }) as DailyActivity[];
 
-      // ✅ FIX: Filter out activities for drivers that no longer exist
-      let filteredActivitiesData = activitiesData;
-      if (validDriverIds.size > 0) {
-        filteredActivitiesData = activitiesData.filter(activity => {
-          // Extract the actual driver ID from the activity document ID or driverId field
-          const activityDocId = activity.id;
-          const activityDriverId = activity.driverId;
-          
-          // Check if the driver ID exists in the valid driver IDs
-          // The document ID format is usually `${driverId}_${date}`
-          const extractedDriverId = activityDocId.split('_')[0];
-          
-          // Check if either the extracted ID or the driverId field exists in validDriverIds
-          const isValid = validDriverIds.has(extractedDriverId) || validDriverIds.has(activityDriverId);
-          
-          if (!isValid) {
-            console.log(`🗑️ Filtering out activity for deleted driver: ${activity.driverName} (${activityDriverId})`);
+        const activitiesData = snapshot.docs.map((activityDoc) => {
+          const data = activityDoc.data();
+          const driverId = data.driverId || activityDoc.id.split('_')[0];
+
+          return {
+            id: activityDoc.id,
+            ...data,
+            driverId: driverId,
+            driverCode: data.driverCode || 'PENDING',
+            isOnline: data.isOnline ?? false,
+            isAvailable: data.isAvailable ?? false,
+            totalMinutes: data.totalMinutes || 0,
+            totalOfflineMinutes: data.totalOfflineMinutes || 0,
+            lastAccumulatedAt: data.lastAccumulatedAt || null,
+          };
+        }) as DailyActivity[];
+
+        // Filter out activities for drivers that no longer exist
+        let filteredActivitiesData = activitiesData;
+
+        if (validDriverIds.size > 0) {
+          filteredActivitiesData = activitiesData.filter((activity) => {
+            const extractedDriverId = activity.id.split('_')[0];
+            return (
+              validDriverIds.has(extractedDriverId) ||
+              validDriverIds.has(activity.driverId)
+            );
+          });
+        }
+
+        const sortedData = filteredActivitiesData.sort((a, b) => {
+          if (sortBy === 'hours') {
+            return (b.totalMinutes || 0) - (a.totalMinutes || 0);
           }
-          
-          return isValid;
+          if (sortBy === 'offline') {
+            return (b.totalOfflineMinutes || 0) - (a.totalOfflineMinutes || 0);
+          }
+          return a.driverName?.localeCompare(b.driverName || '') || 0;
         });
-      }
 
-      const sortedData = filteredActivitiesData.sort((a, b) => {
-        if (sortBy === 'hours') {
-          return (b.totalHours || 0) - (a.totalHours || 0);
-        }
-        if (sortBy === 'offline') {
-          return (b.totalOfflineHours || 0) - (a.totalOfflineHours || 0);
-        }
-        return a.driverName?.localeCompare(b.driverName || '') || 0;
-      });
+        setActivities(sortedData);
+        setLoading(false);
+        setIndexError(null);
+        setLastRefreshTime(new Date());
+        setLastSyncTime(new Date());
+      },
+      (error: any) => {
+        console.error('Error fetching daily activities:', error);
 
-      setActivities(sortedData);
-      setLoading(false);
-      setIndexError(null);
-      setLastRefreshTime(new Date());
-      setLastSyncTime(new Date());
-    }, (error) => {
-      console.error('Error fetching daily activities:', error);
-      if (error.code === 'failed-precondition' || error.message?.includes('index')) {
-        const urlMatch = error.message?.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
-        if (urlMatch) {
-          setIndexError(urlMatch[0]);
+        if (
+          error.code === 'failed-precondition' ||
+          error.message?.includes('index')
+        ) {
+          const urlMatch = error.message?.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+          if (urlMatch) {
+            setIndexError(urlMatch[0]);
+          } else {
+            setIndexError('https://console.firebase.google.com/');
+          }
         } else {
-          setIndexError('https://console.firebase.google.com/v1/r/project/efilling-d1456/firestore/indexes?create_composite=Clpwcm9qZWN0cy9lZmlsbGluZy1kMTQ1Ni9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvZHJpdmVyRGFpbHlBY3Rpdml0eS9pbmRleGVzL18QARoICgRkYXRlEAEaDgoKZHJpdmVyTmFtZRABGgwKCF9fbmFtZV9fEAE');
+          if (!loading) {
+            toast.error('Failed to load activities');
+          }
         }
-      } else {
-        // Only show toast for non-index errors to avoid spam
-        if (!loading) {
-          toast.error('Failed to load activities');
-        }
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
   };
 
-  // Setup both listeners
+  // ============================================================
+  // BOTH LISTENERS
+  // ============================================================
+
   useEffect(() => {
     isMountedRef.current = true;
     setupListener();
@@ -618,80 +879,91 @@ export default function DailyActivityPage() {
         driverUnsubscribeRef.current();
         driverUnsubscribeRef.current = null;
       }
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-        updateTimeoutRef.current = null;
-      }
     };
-  }, [selectedDate, sortBy]);
+  }, [selectedDate]);
 
-  // Refresh data function
+  useEffect(() => {
+    setActivities((current) => {
+      const copy = [...current];
+      copy.sort((a, b) => {
+        if (sortBy === 'hours') return (b.totalMinutes || 0) - (a.totalMinutes || 0);
+        if (sortBy === 'offline') return (b.totalOfflineMinutes || 0) - (a.totalOfflineMinutes || 0);
+        return a.driverName?.localeCompare(b.driverName || '') || 0;
+      });
+      return copy;
+    });
+  }, [sortBy]);
+
+  // ============================================================
+  // REFRESH
+  // ============================================================
+
   const refreshData = async () => {
     if (refreshing) return;
     setRefreshing(true);
     setCurrentTime(new Date());
 
     try {
-      // Re-establish the listener to get fresh data
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
 
-      // Small delay to ensure cleanup
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Re-setup the listener
+      await new Promise((resolve) => setTimeout(resolve, 200));
       setupListener();
+      if (!driverUnsubscribeRef.current) {
+        setupDriverStatusListener();
+      }
 
-      // Also fetch fresh data directly
       const activityRef = collection(db, 'driverDailyActivity');
       const activityQuery = query(activityRef, where('date', '==', selectedDate));
       const activitySnapshot = await getDocs(activityQuery);
 
-      // ✅ FIX: Get valid driver IDs
       let validDriverIds = new Set<string>();
+
       try {
         const driversSnapshot = await getDocs(collection(db, 'drivers'));
-        driversSnapshot.docs.forEach(doc => {
-          validDriverIds.add(doc.id);
+        driversSnapshot.docs.forEach((driverDoc) => {
+          validDriverIds.add(driverDoc.id);
         });
       } catch (error) {
         console.error('Error fetching drivers for validation:', error);
       }
 
-      const activitiesData = activitySnapshot.docs.map(doc => {
-        const data = doc.data();
-        let customDriverId = data.driverId;
-        if (!customDriverId || /^[a-zA-Z0-9]{20,}$/.test(customDriverId)) {
-          customDriverId = data.driverName ? generateDriverId(data.driverName) : `DRV${Date.now().toString().slice(-6)}`;
-        }
+      const activitiesData = activitySnapshot.docs.map((activityDoc) => {
+        const data = activityDoc.data();
+        const driverId = data.driverId || activityDoc.id.split('_')[0];
+
         return {
-          id: doc.id,
+          id: activityDoc.id,
           ...data,
-          driverId: customDriverId,
+          driverId: driverId,
+          driverCode: data.driverCode || 'PENDING',
           isOnline: data.isOnline ?? false,
           isAvailable: data.isAvailable ?? false,
+          totalMinutes: data.totalMinutes || 0,
+          totalOfflineMinutes: data.totalOfflineMinutes || 0,
         };
       }) as DailyActivity[];
 
-      // ✅ FIX: Filter out activities for drivers that no longer exist
       let filteredActivitiesData = activitiesData;
+
       if (validDriverIds.size > 0) {
-        filteredActivitiesData = activitiesData.filter(activity => {
-          const activityDocId = activity.id;
-          const activityDriverId = activity.driverId;
-          const extractedDriverId = activityDocId.split('_')[0];
-          return validDriverIds.has(extractedDriverId) || validDriverIds.has(activityDriverId);
+        filteredActivitiesData = activitiesData.filter((activity) => {
+          const extractedDriverId = activity.id.split('_')[0];
+          return (
+            validDriverIds.has(extractedDriverId) ||
+            validDriverIds.has(activity.driverId)
+          );
         });
       }
 
       const sortedData = filteredActivitiesData.sort((a, b) => {
         if (sortBy === 'hours') {
-          return (b.totalHours || 0) - (a.totalHours || 0);
+          return (b.totalMinutes || 0) - (a.totalMinutes || 0);
         }
         if (sortBy === 'offline') {
-          return (b.totalOfflineHours || 0) - (a.totalOfflineHours || 0);
+          return (b.totalOfflineMinutes || 0) - (a.totalOfflineMinutes || 0);
         }
         return a.driverName?.localeCompare(b.driverName || '') || 0;
       });
@@ -703,7 +975,6 @@ export default function DailyActivityPage() {
     } catch (error) {
       console.error('Error refreshing data:', error);
       toast.error('Failed to refresh data. Retrying...');
-      // Retry with re-setup
       setTimeout(() => {
         setupListener();
       }, 500);
@@ -712,9 +983,12 @@ export default function DailyActivityPage() {
     }
   };
 
-  // Get date range (last 7 days)
+  // ============================================================
+  // DATE RANGE
+  // ============================================================
+
   const getDateRange = () => {
-    const dates = [];
+    const dates: string[] = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -723,15 +997,24 @@ export default function DailyActivityPage() {
     return dates;
   };
 
+  // ============================================================
+  // FORMAT TIME
+  // ============================================================
+
   const formatTime = (timestamp: any): string => {
     if (!timestamp) return 'N/A';
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const date = getTimestamp(timestamp);
+      if (!date) return 'N/A';
       return date.toLocaleTimeString();
     } catch {
       return 'N/A';
     }
   };
+
+  // ============================================================
+  // FORMAT DATE
+  // ============================================================
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr + 'T00:00:00');
@@ -739,15 +1022,22 @@ export default function DailyActivityPage() {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
-  // Calculate duration between two timestamps
-  const calculateDuration = (startTime: any, endTime: Date = currentTime): string => {
+  // ============================================================
+  // DURATION
+  // ============================================================
+
+  const calculateDuration = (
+    startTime: any,
+    endTime: Date = currentTime
+  ): string => {
     if (!startTime) return 'N/A';
     try {
-      const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
+      const start = getTimestamp(startTime);
+      if (!start) return 'N/A';
       const diffMs = endTime.getTime() - start.getTime();
       if (diffMs < 0) return 'N/A';
       const diffMins = Math.floor(diffMs / 60000);
@@ -762,18 +1052,9 @@ export default function DailyActivityPage() {
     }
   };
 
-  // Calculate offline duration accurately
-  const calculateOfflineDuration = (activity: DailyActivity): string => {
-    if (!activity.isOnline && activity.offlineStart) {
-      return calculateDuration(activity.offlineStart);
-    }
-    if (activity.totalOfflineHours !== undefined && activity.totalOfflineHours !== null) {
-      const hours = activity.totalOfflineHours;
-      const minutes = activity.totalOfflineMinutes || 0;
-      return `${hours}h ${minutes}m`;
-    }
-    return '0h 0m';
-  };
+  // ============================================================
+  // STATUS BADGE
+  // ============================================================
 
   const getStatusBadge = (isOnline: boolean) => {
     if (isOnline) {
@@ -790,68 +1071,102 @@ export default function DailyActivityPage() {
     );
   };
 
-  // Calculate total hours for display - using real-time calculation
-  const calculateTotalHoursForDisplay = (activity: DailyActivity): string => {
+  // ============================================================
+  // TOTAL HOURS  // ============================================================
+
+  const calculateTotalHoursForDisplay = (
+    activity: DailyActivity
+  ): string => {
     const { hours, minutes } = calculateDriverHours(activity);
     return `${hours}h ${minutes}m`;
   };
 
-  const getStatusDetails = (activity: DailyActivity): { status: string, duration: string, startTime: string } => {
+  // ============================================================
+  // STATUS DETAILS
+  // ============================================================
+
+  const getStatusDetails = (
+    activity: DailyActivity
+  ): {
+    status: string;
+    duration: string;
+    startTime: string;
+  } => {
     if (activity.isOnline && activity.onlineStart) {
       const duration = calculateDuration(activity.onlineStart);
       return {
         status: 'Online',
         duration: duration,
-        startTime: formatTime(activity.onlineStart)
+        startTime: formatTime(activity.onlineStart),
       };
-    } else if (!activity.isOnline && activity.offlineStart) {
+    }
+    if (!activity.isOnline && activity.offlineStart) {
       const duration = calculateDuration(activity.offlineStart);
       return {
         status: 'Offline',
         duration: duration,
-        startTime: formatTime(activity.offlineStart)
+        startTime: formatTime(activity.offlineStart),
       };
     }
     return {
       status: 'Unknown',
       duration: 'N/A',
-      startTime: 'N/A'
+      startTime: 'N/A',
     };
   };
 
-  const filteredActivities = activities
-    .filter(activity =>
+  // ============================================================
+  // SEARCH
+  // ============================================================
+
+  const filteredActivities = activities.filter(
+    (activity) =>
       activity.driverName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.driverCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.driverId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.numberPlate?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  );
+
+  // ============================================================
+  // STATISTICS
+  // ============================================================
 
   const totalDrivers = filteredActivities.length;
-  const onlineDrivers = filteredActivities.filter(a => a.isOnline).length;
+  const onlineDrivers = filteredActivities.filter((a) => a.isOnline).length;
   const offlineDrivers = totalDrivers - onlineDrivers;
 
-  // REAL-TIME: Calculate total hours including minutes from all drivers
   const totalMinutesWorked = filteredActivities.reduce((sum, a) => {
     const { hours, minutes } = calculateDriverHours(a);
-    return sum + (hours * 60) + minutes;
+    return sum + hours * 60 + minutes;
   }, 0);
+
   const totalHoursWorked = Math.floor(totalMinutesWorked / 60);
   const remainingMinutesWorked = totalMinutesWorked % 60;
 
-  // REAL-TIME: Calculate average including minutes
   const averageMinutes = totalDrivers > 0 ? Math.floor(totalMinutesWorked / totalDrivers) : 0;
   const avgHours = Math.floor(averageMinutes / 60);
   const avgMinutes = averageMinutes % 60;
+
+  // ============================================================
+  // INDEX ERROR
+  // ============================================================
 
   if (indexError) {
     return (
       <div className={`space-y-6 ${getBackgroundClass()}`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Daily Driver Activity</h1>
-            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>View daily performance and activity of all drivers</p>
+            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Daily Driver Activity
+            </h1>
+            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              View daily performance and activity of all drivers
+            </p>
           </div>
-          <Link href="/dashboard" className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+          <Link
+            href="/dashboard"
+            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+          >
             Back to Dashboard
           </Link>
         </div>
@@ -881,6 +1196,10 @@ export default function DailyActivityPage() {
     );
   }
 
+  // ============================================================
+  // LOADING
+  // ============================================================
+
   if (loading) {
     return (
       <div className={`flex items-center justify-center min-h-[60vh] ${getBackgroundClass()}`}>
@@ -889,13 +1208,22 @@ export default function DailyActivityPage() {
     );
   }
 
+  // ============================================================
+  // MAIN UI
+  // ============================================================
+
   return (
     <div className={`p-4 md:p-6 transition-colors duration-300 ${getBackgroundClass()}`}>
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Daily Driver Activity</h1>
-            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>View daily performance and activity of all drivers</p>
+            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Daily Driver Activity
+            </h1>
+            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              View daily performance and activity of all drivers
+            </p>
             <div className="flex items-center gap-3 mt-1">
               <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
                 Last refreshed: {lastRefreshTime.toLocaleTimeString()}
@@ -903,9 +1231,7 @@ export default function DailyActivityPage() {
               <span className="text-xs text-green-500">
                 🟢 Last Sync: {lastSyncTime.toLocaleTimeString()}
               </span>
-              <span className="text-xs text-blue-500 animate-pulse">
-                🔄 Real-time
-              </span>
+              <span className="text-xs text-blue-500 animate-pulse">🔄 Real-time</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -920,31 +1246,70 @@ export default function DailyActivityPage() {
             >
               {refreshing ? (
                 <>
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="animate-spin h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Refreshing...
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
                   </svg>
                   Refresh Data
                 </>
               )}
             </button>
-            <Link href="/dashboard" className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            <Link
+              href="/dashboard"
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            >
               Back to Dashboard
             </Link>
           </div>
         </div>
 
-        {/* Real-time Status Indicator */}
-        <div className={`rounded-xl p-3 flex items-center justify-between ${userBackground === 'dark' ? 'bg-blue-900/30 border border-blue-700 text-blue-200' : 'bg-blue-50 border border-blue-200 text-blue-700'}`}>
+        {/* REAL-TIME STATUS */}
+        <div
+          className={`rounded-xl p-3 flex items-center justify-between ${
+            userBackground === 'dark'
+              ? 'bg-blue-900/30 border border-blue-700 text-blue-200'
+              : 'bg-blue-50 border border-blue-200 text-blue-700'
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'}`}></div>
+            <div
+              className={`w-2 h-2 rounded-full ${
+                refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'
+              }`}
+            />
             <span className={`text-sm ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
               {refreshing ? '🔄 Refreshing data...' : '✅ Live updates: Driver status auto-syncs from database'}
             </span>
@@ -954,7 +1319,7 @@ export default function DailyActivityPage() {
           </span>
         </div>
 
-        {/* Filters and Stats */}
+        {/* FILTERS AND STATS */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="rounded-xl shadow-sm p-4 border bg-cyan-300 border-blue-200">
             <p className="text-sm text-gray-800">Date</p>
@@ -963,7 +1328,7 @@ export default function DailyActivityPage() {
               onChange={(e) => setSelectedDate(e.target.value)}
               className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-400 border-gray-300"
             >
-              {getDateRange().map(date => (
+              {getDateRange().map((date) => (
                 <option key={date} value={date}>
                   {formatDate(date)}
                 </option>
@@ -990,7 +1355,7 @@ export default function DailyActivityPage() {
           </div>
         </div>
 
-        {/* Search and Sort */}
+        {/* SEARCH AND SORT */}
         <div className="rounded-xl shadow-sm p-4 border bg-gray-50 border-gray-200">
           <div className="flex flex-col sm:flex-row gap-4">
             <input
@@ -1002,7 +1367,9 @@ export default function DailyActivityPage() {
             />
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'hours' | 'name' | 'offline')}
+              onChange={(e) =>
+                setSortBy(e.target.value as 'hours' | 'name' | 'offline')
+              }
               className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-400 border-gray-300"
             >
               <option value="hours">Sort by Hours Worked</option>
@@ -1012,33 +1379,70 @@ export default function DailyActivityPage() {
           </div>
         </div>
 
-        {/* Activity Table */}
-        <div className={`rounded-xl shadow-sm border overflow-hidden ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
-          <div className={`p-6 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
-            <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Driver Activity - {formatDate(selectedDate)}</h2>
-            <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{filteredActivities.length} drivers</span>
+        {/* ACTIVITY TABLE */}
+        <div
+          className={`rounded-xl shadow-sm border overflow-hidden ${
+            userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
+          } ${getCardClass()}`}
+        >
+          <div
+            className={`p-6 border-b ${
+              userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'
+            } flex justify-between items-center`}
+          >
+            <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Driver Activity - {formatDate(selectedDate)}
+            </h2>
+            <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              {filteredActivities.length} drivers
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className={userBackground === 'dark' ? 'bg-red-900' : 'bg-red-900'}>
+              <thead className="bg-red-900">
                 <tr>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Driver</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Driver ID</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Plate Number</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Status</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Current Duration</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Offline Duration</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Sessions</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Times</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Total Hours</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Efficiency</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Last Updated</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Driver
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Driver ID
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Plate Number
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Status
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Current Duration
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Offline Duration
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Sessions
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Times
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Total Hours
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Efficiency
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
+                    Last Updated
+                  </th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${userBackground === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
                 {filteredActivities.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className={`px-6 py-8 text-center ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <td
+                      colSpan={11}
+                      className={`px-6 py-8 text-center ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
+                    >
                       No activity records found for this date
                     </td>
                   </tr>
@@ -1046,13 +1450,46 @@ export default function DailyActivityPage() {
                   filteredActivities.map((activity) => {
                     const statusInfo = getStatusDetails(activity);
                     const offlineDuration = calculateOfflineDuration(activity);
-                    const efficiency = activity.efficiency || 0;
+                    
+                    // ============================================================
+                    // EFFICIENCY - Based on total online time vs target 8 hours
+                    // ============================================================
+                    const { hours: efficiencyHours, minutes: efficiencyMinutes } =
+                      calculateDriverHours(activity);
+
+                    const efficiencyTotalMinutes =
+                      efficiencyHours * 60 + efficiencyMinutes;
+
+                    const TARGET_MINUTES = 480; // 8 hours
+
+                    let efficiency = 0;
+
+                    if (efficiencyTotalMinutes <= 0) {
+                      efficiency = 0;
+                    } else if (efficiencyTotalMinutes >= TARGET_MINUTES) {
+                      efficiency = 100;
+                    } else {
+                      efficiency = (efficiencyTotalMinutes / TARGET_MINUTES) * 100;
+                    }
+
+                    efficiency = Math.min(100, Math.max(0, efficiency));
+                    
                     const onlineSessions = activity.onlineSessions || 0;
                     const offlineSessions = activity.offlineSessions || 0;
                     const totalSwitches = activity.totalSwitches || 0;
                     const totalHoursDisplay = calculateTotalHoursForDisplay(activity);
+
+                    const displayDriverId =
+                      activity.driverCode && activity.driverCode !== 'PENDING'
+                        ? activity.driverCode
+                        : 'Assigning...';
+
                     return (
-                      <tr key={activity.id} className={userBackground === 'dark' ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50'}>
+                      <tr
+                        key={activity.id}
+                        className={userBackground === 'dark' ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50'}
+                      >
+                        {/* DRIVER */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="relative">
@@ -1067,33 +1504,47 @@ export default function DailyActivityPage() {
                               )}
                             </div>
                             <div className="ml-3">
-                              <div className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{activity.driverName || 'Unknown'}</div>
+                              <div className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                {activity.driverName || 'Unknown'}
+                              </div>
                             </div>
                           </div>
                         </td>
+
+                        {/* PUBLIC DRIVER ID */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-mono font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {activity.driverId || 'N/A'}
+                            {displayDriverId}
                           </span>
                         </td>
+
+                        {/* PLATE */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                             {activity.numberPlate || 'N/A'}
                           </span>
                         </td>
+
+                        {/* STATUS */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(activity.isOnline)}
                         </td>
+
+                        {/* CURRENT DURATION */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`text-sm font-semibold ${activity.isOnline ? 'text-green-600' : 'text-red-600'}`}>
                             {statusInfo.duration}
                           </span>
                         </td>
+
+                        {/* OFFLINE DURATION - Shows TOTAL offline time today */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-semibold text-red-600">
                             {offlineDuration}
                           </span>
                         </td>
+
+                        {/* SESSIONS */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col space-y-1">
                             <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
@@ -1102,11 +1553,11 @@ export default function DailyActivityPage() {
                             <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                               Offline: {offlineSessions}
                             </span>
-                            <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
-                              Switches: {totalSwitches}
-                            </span>
+                            <span className="text-xs text-gray-400">Switches: {totalSwitches}</span>
                           </div>
                         </td>
+
+                        {/* TIMES */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col space-y-1">
                             {activity.isOnline ? (
@@ -1133,15 +1584,21 @@ export default function DailyActivityPage() {
                               </>
                             )}
                             {!activity.onlineStart && !activity.offlineStart && (
-                              <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>No activity recorded</span>
+                              <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                                No activity recorded
+                              </span>
                             )}
                           </div>
                         </td>
+
+                        {/* TOTAL HOURS */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-lg font-bold text-green-700">
                             {totalHoursDisplay}
                           </span>
                         </td>
+
+                        {/* EFFICIENCY */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div className="w-16 bg-gray-200 rounded-full h-2">
@@ -1155,6 +1612,8 @@ export default function DailyActivityPage() {
                             </span>
                           </div>
                         </td>
+
+                        {/* LAST UPDATED */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {activity.lastUpdated ? formatTime(activity.lastUpdated) : 'N/A'}
                         </td>
@@ -1167,37 +1626,53 @@ export default function DailyActivityPage() {
           </div>
         </div>
 
-        {/* Summary Footer */}
-        <div className={`rounded-xl shadow-sm p-4 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
+        {/* SUMMARY FOOTER */}
+        <div
+          className={`rounded-xl shadow-sm p-4 border ${
+            userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
+          } ${getCardClass()}`}
+        >
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4 bg-cyan-700 text-center">
             <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Total Hours Worked</p>
+              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
+                Total Hours Worked
+              </p>
               <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {totalHoursWorked}h {remainingMinutesWorked}m
               </p>
             </div>
             <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Online Drivers</p>
+              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
+                Online Drivers
+              </p>
               <p className="text-xl font-bold text-green-600">{onlineDrivers}</p>
             </div>
             <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Offline Drivers</p>
+              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
+                Offline Drivers
+              </p>
               <p className="text-xl font-bold text-red-600">{offlineDrivers}</p>
             </div>
             <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Average Working Time</p>
+              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
+                Average Working Time
+              </p>
               <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {avgHours}h {avgMinutes}m
               </p>
             </div>
             <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Total Sessions</p>
+              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
+                Total Sessions
+              </p>
               <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {filteredActivities.reduce((sum, a) => sum + (a.onlineSessions || 0) + (a.offlineSessions || 0), 0)}
               </p>
             </div>
             <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>Last Sync</p>
+              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
+                Last Sync
+              </p>
               <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
                 {lastSyncTime.toLocaleTimeString()}
               </p>

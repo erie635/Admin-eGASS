@@ -387,17 +387,8 @@ export default function ImportFuel() {
             {/* Info Box */}
             <div className="p-4 rounded-lg bg-cyan-700 text-white border border-blue-700">
               <p className="text-sm">
-                ℹ️ Imported fuel will be:
-                <br />
-                • Added to company stock with price tracking
-                <br />
-                • Validated against tank capacity
-                <br />
-                • Distributed to all active drivers
-                <br />
-                • Reflected in the fuel tanks instantly
-                <br />
-                • <strong>Price will be shown in the activity log</strong>
+               
+                • <strong>Copyright © 2026 eGAS. All rights reserved.</strong>
               </p>
             </div>
 

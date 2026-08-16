@@ -182,8 +182,19 @@ export default function EditDriver() {
   const isMountedRef = useRef(true);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const emailCheckCache = useRef<Map<string, boolean>>(new Map());
-  const toastShownRef = useRef(false);
-  const fuelToastShownRef = useRef(false);
+  
+  // ✅ IMPROVED: Toast debounce refs
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toastQueueRef = useRef<string[]>([]);
+  const isToastShowingRef = useRef(false);
+  
+  const fuelToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fuelToastQueueRef = useRef<string[]>([]);
+  const isFuelToastShowingRef = useRef(false);
+  
+  // ✅ IMPROVED: Rating debounce ref
+  const ratingUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingRatingUpdateRef = useRef<boolean>(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -229,6 +240,121 @@ export default function EditDriver() {
     pricePerKm: 0,
     userType: 'driver'
   });
+
+  // ✅ IMPROVED: Toast queue processor
+  const processToastQueue = useCallback(() => {
+    if (!isToastShowingRef.current && toastQueueRef.current.length > 0) {
+      const message = toastQueueRef.current.shift();
+      if (message) {
+        isToastShowingRef.current = true;
+        toast.success(message, {
+          duration: 2000,
+          onClose: () => {
+            isToastShowingRef.current = false;
+            // Process next toast after a short delay
+            setTimeout(() => {
+              processToastQueue();
+            }, 300);
+          }
+        });
+      }
+    }
+  }, []);
+
+  const addStatusToast = useCallback((message: string) => {
+    toastQueueRef.current.push(message);
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      processToastQueue();
+    }, 500);
+  }, [processToastQueue]);
+
+  // ✅ IMPROVED: Fuel toast queue processor
+  const processFuelToastQueue = useCallback(() => {
+    if (!isFuelToastShowingRef.current && fuelToastQueueRef.current.length > 0) {
+      const message = fuelToastQueueRef.current.shift();
+      if (message) {
+        isFuelToastShowingRef.current = true;
+        toast.success(message, {
+          duration: 2000,
+          onClose: () => {
+            isFuelToastShowingRef.current = false;
+            setTimeout(() => {
+              processFuelToastQueue();
+            }, 300);
+          }
+        });
+      }
+    }
+  }, []);
+
+  const addFuelToast = useCallback((message: string) => {
+    fuelToastQueueRef.current.push(message);
+    if (fuelToastTimeoutRef.current) {
+      clearTimeout(fuelToastTimeoutRef.current);
+    }
+    fuelToastTimeoutRef.current = setTimeout(() => {
+      processFuelToastQueue();
+    }, 500);
+  }, [processFuelToastQueue]);
+
+  // ✅ IMPROVED: Enhanced photo URL extraction
+  const getStoredPhotoPath = useCallback((photoUrl?: string | null): string | null => {
+    if (!photoUrl) return null;
+    
+    // Check if it's a Firebase Storage URL
+    if (!photoUrl.includes('firebasestorage.googleapis.com')) {
+      return null;
+    }
+    
+    try {
+      // Try to extract path from URL
+      const decoded = decodeURIComponent(photoUrl);
+      const match = decoded.match(/\/o\/(.+?)(?:\?|$)/);
+      if (match && match[1]) {
+        return match[1].replace(/%2F/g, '/');
+      }
+      
+      // Alternative extraction for different URL formats
+      const urlObj = new URL(photoUrl);
+      const pathMatch = urlObj.pathname.match(/\/o\/(.+)/);
+      if (pathMatch && pathMatch[1]) {
+        return decodeURIComponent(pathMatch[1]);
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Could not parse photo URL:', photoUrl, error);
+      return null;
+    }
+  }, []);
+
+  // ✅ IMPROVED: Clean up all toast timeouts
+  const cleanupToasts = useCallback(() => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+    }
+    if (fuelToastTimeoutRef.current) {
+      clearTimeout(fuelToastTimeoutRef.current);
+      fuelToastTimeoutRef.current = null;
+    }
+    toastQueueRef.current = [];
+    fuelToastQueueRef.current = [];
+    isToastShowingRef.current = false;
+    isFuelToastShowingRef.current = false;
+  }, []);
+
+  // ✅ IMPROVED: Clean up rating timeout
+  const cleanupRatingTimeout = useCallback(() => {
+    if (ratingUpdateTimeoutRef.current) {
+      clearTimeout(ratingUpdateTimeoutRef.current);
+      ratingUpdateTimeoutRef.current = null;
+    }
+    pendingRatingUpdateRef.current = false;
+  }, []);
 
   // ✅ Sentiment Analysis - Positive, Negative, Moderate word lists
   const positiveWords = [
@@ -305,8 +431,29 @@ export default function EditDriver() {
     }
   }, []);
 
-  // ✅ Calculate driver rating based on feedback with sentiment analysis
-  const calculateDriverRating = useCallback(async (driverId: string) => {
+  // ✅ IMPROVED: Calculate driver rating based on feedback with sentiment analysis (debounced)
+  const calculateDriverRating = useCallback(async (driverId: string, immediate: boolean = false) => {
+    // Debounce rating updates
+    if (!immediate) {
+      if (ratingUpdateTimeoutRef.current) {
+        clearTimeout(ratingUpdateTimeoutRef.current);
+      }
+      pendingRatingUpdateRef.current = true;
+      
+      return new Promise((resolve) => {
+        ratingUpdateTimeoutRef.current = setTimeout(async () => {
+          pendingRatingUpdateRef.current = false;
+          const result = await performRatingCalculation(driverId);
+          resolve(result);
+        }, 2000); // 2 second debounce
+      });
+    }
+    
+    return performRatingCalculation(driverId);
+  }, []);
+
+  // ✅ Separate function for actual rating calculation
+  const performRatingCalculation = useCallback(async (driverId: string) => {
     try {
       // Get all feedback for this driver
       const feedbackQuery = query(
@@ -382,10 +529,10 @@ export default function EditDriver() {
     }
   }, [analyzeSentiment]);
 
-  // ✅ Update driver rating in Firestore with sentiment analysis
-  const updateDriverRating = useCallback(async (driverId: string) => {
+  // ✅ IMPROVED: Update driver rating in Firestore with sentiment analysis (debounced)
+  const updateDriverRating = useCallback(async (driverId: string, immediate: boolean = false) => {
     try {
-      const ratingData = await calculateDriverRating(driverId);
+      const ratingData = await calculateDriverRating(driverId, immediate);
       if (!ratingData) return;
      
       const driverRef = doc(db, 'drivers', driverId);
@@ -433,7 +580,7 @@ export default function EditDriver() {
     }
   }, [calculateDriverRating]);
 
-  // ✅ Listen for feedback changes to update driver rating in real-time
+  // ✅ IMPROVED: Listen for feedback changes with debounce
   useEffect(() => {
     if (!driverId || loading) return;
    
@@ -444,19 +591,22 @@ export default function EditDriver() {
     );
    
     const unsubscribe = onSnapshot(feedbackQuery, async (snapshot) => {
-      // Update rating when feedback changes
-      await updateDriverRating(driverId);
+      // ✅ Debounced rating update
+      await updateDriverRating(driverId, false);
     }, (error) => {
       console.error('Error listening to feedback changes:', error);
     });
    
-    return () => unsubscribe();
-  }, [driverId, loading, updateDriverRating]);
+    return () => {
+      unsubscribe();
+      cleanupRatingTimeout();
+    };
+  }, [driverId, loading, updateDriverRating, cleanupRatingTimeout]);
 
   // ✅ Update rating when a new feedback is added (triggered by real-time listener)
   const updateRatingOnFeedback = useCallback(async () => {
     if (!driverId) return;
-    await updateDriverRating(driverId);
+    await updateDriverRating(driverId, false);
   }, [driverId, updateDriverRating]);
 
   // Keep the live-location age indicator accurate even when Firestore is quiet.
@@ -547,10 +697,10 @@ export default function EditDriver() {
         clearTimeout(hoverTimeoutRef.current);
       }
       emailCheckCache.current.clear();
-      toastShownRef.current = false;
-      fuelToastShownRef.current = false;
+      cleanupToasts();
+      cleanupRatingTimeout();
     };
-  }, [driverId, fetchMainTankStock]);
+  }, [driverId, fetchMainTankStock, cleanupToasts, cleanupRatingTimeout]);
 
   // Listen for main tank stock updates (hidden from UI)
   useEffect(() => {
@@ -630,12 +780,12 @@ export default function EditDriver() {
         const isOnlineChanged = prev.isOnline !== data.isOnline;
         const statusChangedLocal = prev.status !== data.status;
        
-        if ((isOnlineChanged || statusChangedLocal) && !toastShownRef.current) {
+        if ((isOnlineChanged || statusChangedLocal)) {
           statusChanged = true;
           statusMessage = `⚠️ Driver status updated to ${data.isOnline ? '🟢 Online' : '⚪ Offline'} (from driver app)`;
           addStatusUpdate(statusMessage);
-          toastShownRef.current = true;
-          setTimeout(() => { toastShownRef.current = false; }, 3000);
+          // ✅ IMPROVED: Use debounced toast
+          addStatusToast(statusMessage);
         }
 
         return {
@@ -659,7 +809,7 @@ export default function EditDriver() {
         if (!prev) return null;
         const oldFuel = prev.remainingFuel;
         const newFuel = data.remainingFuel;
-        if (oldFuel && newFuel && !fuelToastShownRef.current) {
+        if (oldFuel && newFuel) {
           for (const key of Object.keys(newFuel)) {
             const typedKey = key as keyof typeof oldFuel;
             if (oldFuel[typedKey] !== newFuel[typedKey]) {
@@ -668,8 +818,8 @@ export default function EditDriver() {
               const sign = diff > 0 ? '+' : '';
               fuelMessage = `⚠️ Fuel ${diff > 0 ? 'increased' : 'decreased'}: ${key} ${sign}${diff.toFixed(1)}L`;
               addStatusUpdate(fuelMessage);
-              fuelToastShownRef.current = true;
-              setTimeout(() => { fuelToastShownRef.current = false; }, 3000);
+              // ✅ IMPROVED: Use debounced fuel toast
+              addFuelToast(fuelMessage);
               break;
             }
           }
@@ -713,17 +863,20 @@ export default function EditDriver() {
         };
       });
 
+      // ✅ Only show toast if not already showing
       if (statusChanged && statusMessage && isMountedRef.current) {
-        toast.success(statusMessage, { duration: 3000 });
+        addStatusToast(statusMessage);
       }
       if (fuelChanged && fuelMessage && isMountedRef.current) {
-        toast.success(fuelMessage, { duration: 3000 });
+        addFuelToast(fuelMessage);
       }
     }, (error) => {
       console.error('❌ Real-time listener error:', error);
-      if (isMountedRef.current) toast.error('❌ Connection error. Retrying...');
+      if (isMountedRef.current) {
+        toast.error('❌ Connection error. Retrying...');
+      }
     });
-  }, [driverId, addStatusUpdate]);
+  }, [driverId, addStatusUpdate, addStatusToast, addFuelToast]);
 
   const renderStatusUpdates = () => {
     if (statusUpdateMessages.length === 0 || !showStatusUpdates) return null;
@@ -765,23 +918,11 @@ export default function EditDriver() {
        
         // If rating is 0 but there might be feedback, calculate it
         if (rating === 0) {
-          const ratingData = await calculateDriverRating(driverId);
+          const ratingData = await updateDriverRating(driverId, true); // Immediate calculation
           if (ratingData && ratingData.totalFeedbacks > 0) {
             rating = ratingData.rating;
             totalFeedbacks = ratingData.totalFeedbacks;
             totalRatingPoints = ratingData.totalRatingPoints;
-           
-            // Update the driver document with the calculated rating
-            await updateDoc(docRef, {
-              rating: rating,
-              totalFeedbacks: totalFeedbacks,
-              totalRatingPoints: totalRatingPoints,
-              sentimentPositive: ratingData.sentimentBreakdown.positive || 0,
-              sentimentNegative: ratingData.sentimentBreakdown.negative || 0,
-              sentimentModerate: ratingData.sentimentBreakdown.moderate || 0,
-              sentimentNeutral: ratingData.sentimentBreakdown.neutral || 0,
-              updatedAt: new Date().toISOString()
-            });
           }
         }
        
@@ -1235,18 +1376,7 @@ export default function EditDriver() {
     reader.readAsDataURL(file);
   };
 
-  const getStoredPhotoPath = (photoUrl?: string | null) => {
-    if (!photoUrl) return null;
-    try {
-      const decoded = decodeURIComponent(photoUrl);
-      const match = decoded.match(/\/o\/(.+?)(?:\?|$)/);
-      if (match?.[1]) return match[1].replace(/%2F/g, '/');
-    } catch {
-      // Fall back to the known current storage location below.
-    }
-    return null;
-  };
-
+  // ✅ IMPROVED: Enhanced photo save with better error handling
   const handleSavePhoto = async () => {
     if (!selectedFile || !driverId) { toast.error('No file selected'); return; }
 
@@ -1262,6 +1392,7 @@ export default function EditDriver() {
         return;
       }
      
+      // ✅ IMPROVED: Better photo deletion with path validation
       if (driver?.photoURL) {
         const storedPath = getStoredPhotoPath(driver.photoURL);
         const candidatePaths = [
@@ -1274,19 +1405,38 @@ export default function EditDriver() {
           `drivers/${driverId}/profile`
         ].filter(Boolean) as string[];
 
+        let deleted = false;
         for (const path of [...new Set(candidatePaths)]) {
+          if (!path) continue;
           try {
-            await deleteObject(ref(storage, path));
+            const fileRef = ref(storage, path);
+            await deleteObject(fileRef);
+            deleted = true;
+            console.log('✅ Deleted old photo:', path);
             break;
-          } catch {
-            // Try the next known path.
+          } catch (err) {
+            // Continue trying other paths
+            console.log('ℹ️ Could not delete at path:', path, err);
           }
+        }
+        if (!deleted) {
+          console.log('ℹ️ No existing photo found to delete');
         }
       }
 
+      // ✅ IMPROVED: Use unique filename with timestamp
+      const timestamp = Date.now();
       const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const storageRef = ref(storage, `drivers/${driverId}/profile.${fileExtension}`);
-      const uploadTask = uploadBytesResumable(storageRef, selectedFile, { contentType: selectedFile.type });
+      const storagePath = `drivers/${driverId}/profile_${timestamp}.${fileExtension}`;
+      const storageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(storageRef, selectedFile, { 
+        contentType: selectedFile.type,
+        customMetadata: {
+          uploadedAt: new Date().toISOString(),
+          driverId: driverId,
+          fileName: selectedFile.name
+        }
+      });
 
       uploadTask.on(
         'state_changed',
@@ -1305,9 +1455,13 @@ export default function EditDriver() {
           if (!isMountedRef.current) return;
           try {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            
+            // ✅ IMPROVED: Store both the URL and the storage path for easier deletion later
             await updateDoc(docRef, {
               photoURL: downloadURL,
               driverPhoto: downloadURL,
+              photoStoragePath: storagePath,
+              photoUploadedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
 
@@ -1332,6 +1486,7 @@ export default function EditDriver() {
     }
   };
 
+  // ✅ IMPROVED: Enhanced photo removal with better path handling
   const handleRemovePhoto = async () => {
     if (!driver?.photoURL) return;
     if (!confirm('Remove this photo?')) return;
@@ -1344,7 +1499,10 @@ export default function EditDriver() {
         return;
       }
      
-      const storedPath = getStoredPhotoPath(driver.photoURL);
+      // ✅ IMPROVED: Check for stored path from metadata first
+      const data = docSnap.data();
+      const storedPath = data.photoStoragePath || getStoredPhotoPath(driver.photoURL);
+      
       const candidatePaths = [
         storedPath,
         `drivers/${driverId}/profile.jpg`,
@@ -1357,17 +1515,30 @@ export default function EditDriver() {
 
       let deleted = false;
       for (const path of [...new Set(candidatePaths)]) {
+        if (!path) continue;
         try {
-          await deleteObject(ref(storage, path));
+          const fileRef = ref(storage, path);
+          await deleteObject(fileRef);
           deleted = true;
+          console.log('✅ Deleted photo:', path);
           break;
-        } catch {
-          // Try the next known path.
+        } catch (err) {
+          console.log('ℹ️ Could not delete at path:', path, err);
         }
       }
-      if (!deleted) console.log('ℹ️ Storage photo object was already missing.');
+      
+      if (!deleted) {
+        console.log('ℹ️ No storage photo found to delete');
+      }
 
-      await updateDoc(docRef, { photoURL: null, driverPhoto: null, updatedAt: new Date().toISOString() });
+      await updateDoc(docRef, { 
+        photoURL: null, 
+        driverPhoto: null,
+        photoStoragePath: null,
+        photoUploadedAt: null,
+        updatedAt: new Date().toISOString() 
+      });
+      
       setPhotoPreview(null);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1394,225 +1565,225 @@ export default function EditDriver() {
   }, [driverId]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
-  e.preventDefault();
- 
-  if (!passwordData.newPassword || !passwordData.confirmPassword) {
-    toast.error('Please fill in both password fields');
-    return;
-  }
-  if (passwordData.newPassword !== passwordData.confirmPassword) {
-    toast.error('New passwords do not match');
-    return;
-  }
-  if (passwordData.newPassword.length < 6) {
-    toast.error('Password must be at least 6 characters');
-    return;
-  }
-
-  setUpdatingPassword(true);
-  try {
-    const currentUser = auth.currentUser;
+    e.preventDefault();
    
-    if (!currentUser) {
-      toast.error('You must be logged in as admin to change driver passwords');
-      setUpdatingPassword(false);
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      toast.error('Please fill in both password fields');
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
       return;
     }
 
-    const driverEmail = driver?.email;
-    const driverName = driver?.name;
-
-    if (!driverEmail) {
-      toast.error('Driver email not found. Please update the email first.');
-      setUpdatingPassword(false);
-      return;
-    }
-
-    // Get the admin token for authentication
-    const adminToken = await currentUser.getIdToken();
-
-    // First, check if the driver has an authUserId
-    if (!driver?.authUserId && !driver?.userId) {
-      // Driver doesn't have an auth account, create one
-      try {
-        const driverAuth = getDriverAuth();
-        const userCredential = await createUserWithEmailAndPassword(
-          driverAuth,
-          driverEmail,
-          passwordData.newPassword
-        );
-       
-        const uid = userCredential.user.uid;
-        await updateProfile(userCredential.user, { displayName: driverName || '' });
-       
-        const driverRef = doc(db, 'drivers', driverId);
-        await updateDoc(driverRef, {
-          hasPasswordSet: true,
-          authUserId: uid,
-          userId: uid,
-          passwordUpdatedAt: new Date().toISOString()
-        });
-
-        setHasExistingPassword(true);
-        toast.success(`✅ Password created successfully for ${driverName}!`, {
-          duration: 4000,
-          icon: '🔐'
-        });
-
-        setShowPasswordModal(false);
-        setPasswordData({ newPassword: '', confirmPassword: '' });
+    setUpdatingPassword(true);
+    try {
+      const currentUser = auth.currentUser;
+     
+      if (!currentUser) {
+        toast.error('You must be logged in as admin to change driver passwords');
         setUpdatingPassword(false);
         return;
-      } catch (error: any) {
-        if (error.code === 'auth/email-already-in-use') {
-          // Email exists but authUserId might not be set in Firestore
-          // Try to update the password using the API
-          toast.info('Account exists. Attempting to update password...');
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    // If we have an authUserId or the email exists, use the Admin API to update
-    try {
-      const response = await fetch('/api/admin/drivers/update-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          driverId: driverId,
-          newPassword: passwordData.newPassword,
-          adminToken: adminToken,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 404 && data.error?.includes('authentication account')) {
-          // Driver doesn't have an auth account, create one
-          try {
-            const driverAuth = getDriverAuth();
-            const userCredential = await createUserWithEmailAndPassword(
-              driverAuth,
-              driverEmail,
-              passwordData.newPassword
-            );
-           
-            const uid = userCredential.user.uid;
-            await updateProfile(userCredential.user, { displayName: driverName || '' });
-           
-            const driverRef = doc(db, 'drivers', driverId);
-            await updateDoc(driverRef, {
-              hasPasswordSet: true,
-              authUserId: uid,
-              userId: uid,
-              passwordUpdatedAt: new Date().toISOString()
-            });
-
-            setHasExistingPassword(true);
-            toast.success(`✅ Password created successfully for ${driverName}!`, {
-              duration: 4000,
-              icon: '🔐'
-            });
-
-            setShowPasswordModal(false);
-            setPasswordData({ newPassword: '', confirmPassword: '' });
-            setUpdatingPassword(false);
-            return;
-          } catch (createError: any) {
-            if (createError.code === 'auth/email-already-in-use') {
-              toast.info('Account already exists. Please try updating the password again.');
-            } else {
-              throw createError;
-            }
-          }
-        } else {
-          throw new Error(data.error || 'Failed to update password');
-        }
       }
 
-      // Success
-      if (data.success) {
-        toast.success(`✅ Password updated successfully for ${driverName}!`, {
-          duration: 4000,
-          icon: '🔐'
-        });
+      const driverEmail = driver?.email;
+      const driverName = driver?.name;
 
-        // Update local state
-        setHasExistingPassword(true);
-        setDriver(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            hasPasswordSet: true,
-            authUserId: data.authUserId || prev.authUserId,
-            passwordUpdatedAt: new Date().toISOString()
-          };
-        });
-
-        setShowPasswordModal(false);
-        setPasswordData({ newPassword: '', confirmPassword: '' });
+      if (!driverEmail) {
+        toast.error('Driver email not found. Please update the email first.');
+        setUpdatingPassword(false);
+        return;
       }
-    } catch (error: any) {
-      console.error('Error updating password through API:', error);
-      
-      // Fallback: If API fails, try sending reset email
-      if (error.message?.includes('not found') || error.message?.includes('authentication account')) {
+
+      // Get the admin token for authentication
+      const adminToken = await currentUser.getIdToken();
+
+      // First, check if the driver has an authUserId
+      if (!driver?.authUserId && !driver?.userId) {
+        // Driver doesn't have an auth account, create one
         try {
-          await sendPasswordResetEmail(auth, driverEmail);
-          
+          const driverAuth = getDriverAuth();
+          const userCredential = await createUserWithEmailAndPassword(
+            driverAuth,
+            driverEmail,
+            passwordData.newPassword
+          );
+         
+          const uid = userCredential.user.uid;
+          await updateProfile(userCredential.user, { displayName: driverName || '' });
+         
           const driverRef = doc(db, 'drivers', driverId);
           await updateDoc(driverRef, {
-            passwordResetSent: new Date().toISOString(),
             hasPasswordSet: true,
-            needsPasswordReset: true
+            authUserId: uid,
+            userId: uid,
+            passwordUpdatedAt: new Date().toISOString()
           });
 
-          toast.success(`📧 Password reset email sent to ${driverEmail}`, {
-            duration: 5000,
-            icon: '📧'
-          });
-          
-          toast.success('The driver will receive an email to set their own password.', {
+          setHasExistingPassword(true);
+          toast.success(`✅ Password created successfully for ${driverName}!`, {
             duration: 4000,
-            icon: 'ℹ️'
+            icon: '🔐'
           });
 
           setShowPasswordModal(false);
           setPasswordData({ newPassword: '', confirmPassword: '' });
-        } catch (resetError: any) {
-          console.error('Reset email error:', resetError);
-          
-          if (resetError.code === 'auth/user-not-found') {
-            toast.error('Driver account not found. Please create the account first.');
-          } else if (resetError.code === 'auth/too-many-requests') {
-            toast.error('Too many requests. Please try again later.');
+          setUpdatingPassword(false);
+          return;
+        } catch (error: any) {
+          if (error.code === 'auth/email-already-in-use') {
+            // Email exists but authUserId might not be set in Firestore
+            // Try to update the password using the API
+            toast.info('Account exists. Attempting to update password...');
           } else {
-            toast.error('Failed to send reset email: ' + (resetError.message || 'Unknown error'));
+            throw error;
           }
         }
+      }
+
+      // If we have an authUserId or the email exists, use the Admin API to update
+      try {
+        const response = await fetch('/api/admin/drivers/update-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            driverId: driverId,
+            newPassword: passwordData.newPassword,
+            adminToken: adminToken,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 404 && data.error?.includes('authentication account')) {
+            // Driver doesn't have an auth account, create one
+            try {
+              const driverAuth = getDriverAuth();
+              const userCredential = await createUserWithEmailAndPassword(
+                driverAuth,
+                driverEmail,
+                passwordData.newPassword
+              );
+             
+              const uid = userCredential.user.uid;
+              await updateProfile(userCredential.user, { displayName: driverName || '' });
+             
+              const driverRef = doc(db, 'drivers', driverId);
+              await updateDoc(driverRef, {
+                hasPasswordSet: true,
+                authUserId: uid,
+                userId: uid,
+                passwordUpdatedAt: new Date().toISOString()
+              });
+
+              setHasExistingPassword(true);
+              toast.success(`✅ Password created successfully for ${driverName}!`, {
+                duration: 4000,
+                icon: '🔐'
+              });
+
+              setShowPasswordModal(false);
+              setPasswordData({ newPassword: '', confirmPassword: '' });
+              setUpdatingPassword(false);
+              return;
+            } catch (createError: any) {
+              if (createError.code === 'auth/email-already-in-use') {
+                toast.info('Account already exists. Please try updating the password again.');
+              } else {
+                throw createError;
+              }
+            }
+          } else {
+            throw new Error(data.error || 'Failed to update password');
+          }
+        }
+
+        // Success
+        if (data.success) {
+          toast.success(`✅ Password updated successfully for ${driverName}!`, {
+            duration: 4000,
+            icon: '🔐'
+          });
+
+          // Update local state
+          setHasExistingPassword(true);
+          setDriver(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              hasPasswordSet: true,
+              authUserId: data.authUserId || prev.authUserId,
+              passwordUpdatedAt: new Date().toISOString()
+            };
+          });
+
+          setShowPasswordModal(false);
+          setPasswordData({ newPassword: '', confirmPassword: '' });
+        }
+      } catch (error: any) {
+        console.error('Error updating password through API:', error);
+        
+        // Fallback: If API fails, try sending reset email
+        if (error.message?.includes('not found') || error.message?.includes('authentication account')) {
+          try {
+            await sendPasswordResetEmail(auth, driverEmail);
+            
+            const driverRef = doc(db, 'drivers', driverId);
+            await updateDoc(driverRef, {
+              passwordResetSent: new Date().toISOString(),
+              hasPasswordSet: true,
+              needsPasswordReset: true
+            });
+
+            toast.success(`📧 Password reset email sent to ${driverEmail}`, {
+              duration: 5000,
+              icon: '📧'
+            });
+            
+            toast.success('The driver will receive an email to set their own password.', {
+              duration: 4000,
+              icon: 'ℹ️'
+            });
+
+            setShowPasswordModal(false);
+            setPasswordData({ newPassword: '', confirmPassword: '' });
+          } catch (resetError: any) {
+            console.error('Reset email error:', resetError);
+            
+            if (resetError.code === 'auth/user-not-found') {
+              toast.error('Driver account not found. Please create the account first.');
+            } else if (resetError.code === 'auth/too-many-requests') {
+              toast.error('Too many requests. Please try again later.');
+            } else {
+              toast.error('Failed to send reset email: ' + (resetError.message || 'Unknown error'));
+            }
+          }
+        } else {
+          toast.error('Failed to update password: ' + (error.message || 'Unknown error'));
+        }
+      }
+    } catch (error: any) {
+      console.error('Error updating password:', error);
+      if (error.code === 'auth/weak-password') {
+        toast.error('Password is too weak. Use at least 6 characters with a mix of letters and numbers.');
+      } else if (error.code === 'auth/email-already-in-use') {
+        toast.error('Email already registered. A reset email has been sent.');
+      } else if (error.code === 'auth/too-many-requests') {
+        toast.error('Too many requests. Please try again later.');
       } else {
         toast.error('Failed to update password: ' + (error.message || 'Unknown error'));
       }
+    } finally {
+      setUpdatingPassword(false);
     }
-  } catch (error: any) {
-    console.error('Error updating password:', error);
-    if (error.code === 'auth/weak-password') {
-      toast.error('Password is too weak. Use at least 6 characters with a mix of letters and numbers.');
-    } else if (error.code === 'auth/email-already-in-use') {
-      toast.error('Email already registered. A reset email has been sent.');
-    } else if (error.code === 'auth/too-many-requests') {
-      toast.error('Too many requests. Please try again later.');
-    } else {
-      toast.error('Failed to update password: ' + (error.message || 'Unknown error'));
-    }
-  } finally {
-    setUpdatingPassword(false);
-  }
-};
+  };
 
   const createDriverAccount = async (email: string, password: string, name: string, phone: string) => {
     try {
@@ -1971,7 +2142,7 @@ export default function EditDriver() {
               >
                 {updatingStatus ? (
                   <span className="flex items-center space-x-2">
-                    <svg className="animate-spin h-4 w-4" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -2345,7 +2516,7 @@ export default function EditDriver() {
                   <button type="submit" disabled={updatingPassword} className={`px-6 py-2 text-sm font-bold text-white rounded-lg transition disabled:opacity-50 ${hasExistingPassword ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600 animate-pulse'}`}>
                     {updatingPassword ? (
                       <span className="flex items-center space-x-2">
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>

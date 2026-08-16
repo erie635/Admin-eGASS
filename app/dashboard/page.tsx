@@ -72,7 +72,7 @@ const ALLOWED_PATHS: string[] = [
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [totalStock, setTotalStock] = useState({
     Petrol: 0,
     Diesel: 0,

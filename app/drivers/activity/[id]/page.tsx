@@ -4,41 +4,117 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '../../../../lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+
+interface Driver {
+  id: string;
+  name: string;
+  isOnline: boolean;
+  status: string;
+  lastUpdate: any;
+  onlineHistory?: Array<{ timestamp: any; date: string; time: string }>;
+  offlineHistory?: Array<{ timestamp: any; date: string; time: string }>;
+}
+
+interface ActivitySummary {
+  onlineCount: number;
+  offlineCount: number;
+  totalOnlineMinutes: number;
+  totalOfflineMinutes: number;
+  efficiency?: number;
+}
 
 export default function DriverActivityPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [driver, setDriver] = useState<any>(null);
+  const [driver, setDriver] = useState<Driver | null>(null);
   const [activityData, setActivityData] = useState({
-    today: { online: 0, offline: 0, totalOnlineMinutes: 0, totalOfflineMinutes: 0 },
-    week: { online: 0, offline: 0, totalOnlineMinutes: 0, totalOfflineMinutes: 0 },
-    month: { online: 0, offline: 0, totalOnlineMinutes: 0, totalOfflineMinutes: 0 }
+    today: { onlineCount: 0, offlineCount: 0, totalOnlineMinutes: 0, totalOfflineMinutes: 0, efficiency: 0 },
+    week: { onlineCount: 0, offlineCount: 0, totalOnlineMinutes: 0, totalOfflineMinutes: 0, efficiency: 0 },
+    month: { onlineCount: 0, offlineCount: 0, totalOnlineMinutes: 0, totalOfflineMinutes: 0, efficiency: 0 }
   });
 
   useEffect(() => {
     fetchDriverActivity();
   }, [params.id]);
 
-  const calculateTimeBetween = (startTime: string, endTime: string) => {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    return Math.floor((end.getTime() - start.getTime()) / 60000); // minutes
+  /**
+   * Get the start of day for a given date
+   */
+  const getStartOfDay = (date: Date): Date => {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
   };
 
-  const calculateActivity = (history: any[], period: 'today' | 'week' | 'month') => {
+  /**
+   * Calculate the duration between two timestamps in minutes
+   */
+  const calculateDuration = (start: any, end: any): number => {
+    if (!start || !end) return 0;
+    
+    try {
+      const startDate = start.toDate ? start.toDate() : new Date(start);
+      const endDate = end.toDate ? end.toDate() : new Date(end);
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return 0;
+      }
+      
+      const diffMs = endDate.getTime() - startDate.getTime();
+      return Math.max(0, Math.floor(diffMs / 60000));
+    } catch (error) {
+      console.error('Error calculating duration:', error);
+      return 0;
+    }
+  };
+
+  /**
+   * Get the timestamp from Firestore or Date object
+   */
+  const getTimestamp = (value: any): Date | null => {
+    if (!value) return null;
+    try {
+      if (value.toDate) {
+        return value.toDate();
+      }
+      return new Date(value);
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * Check if a date falls within a period
+   */
+  const isDateInPeriod = (date: Date, period: 'today' | 'week' | 'month'): boolean => {
     const now = new Date();
-    let periodStart = new Date();
+    const periodStart = new Date(now);
     
     if (period === 'today') {
-      periodStart = new Date(now.setHours(0, 0, 0, 0));
+      periodStart.setHours(0, 0, 0, 0);
+      const todayStart = getStartOfDay(now);
+      return date >= todayStart && date <= now;
     } else if (period === 'week') {
-      periodStart = new Date(now);
       periodStart.setDate(periodStart.getDate() - 7);
+      periodStart.setHours(0, 0, 0, 0);
+      return date >= periodStart && date <= now;
     } else {
-      periodStart = new Date(now);
       periodStart.setDate(periodStart.getDate() - 30);
+      periodStart.setHours(0, 0, 0, 0);
+      return date >= periodStart && date <= now;
+    }
+  };
+
+  /**
+   * Calculate activity summary for a given period
+   */
+  const calculateActivityForPeriod = (
+    history: Array<{ timestamp: any; status: string }>,
+    period: 'today' | 'week' | 'month',
+    currentStatus: boolean
+  ): ActivitySummary => {
+    if (!history || history.length === 0) {
+      return { onlineCount: 0, offlineCount: 0, totalOnlineMinutes: 0, totalOfflineMinutes: 0, efficiency: 0 };
     }
 
     let onlineCount = 0;
@@ -46,55 +122,148 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
     let totalOnlineMinutes = 0;
     let totalOfflineMinutes = 0;
 
-    for (let i = 0; i < history.length - 1; i++) {
-      const current = new Date(history[i].timestamp);
-      const next = new Date(history[i + 1].timestamp);
+    // Sort history by timestamp
+    const sortedHistory = [...history].sort((a, b) => {
+      const aTime = getTimestamp(a.timestamp)?.getTime() || 0;
+      const bTime = getTimestamp(b.timestamp)?.getTime() || 0;
+      return aTime - bTime;
+    });
+
+    // Process each event
+    for (let i = 0; i < sortedHistory.length; i++) {
+      const current = sortedHistory[i];
+      const currentTime = getTimestamp(current.timestamp);
       
-      if (current >= periodStart) {
-        const diffMinutes = Math.floor((next.getTime() - current.getTime()) / 60000);
-        
-        if (history[i].status === 'online') {
-          onlineCount++;
-          totalOnlineMinutes += diffMinutes;
+      if (!currentTime) continue;
+
+      // Skip if this event is outside the period
+      if (!isDateInPeriod(currentTime, period)) {
+        continue;
+      }
+
+      // Count the event itself
+      if (current.status === 'online') {
+        onlineCount++;
+      } else if (current.status === 'offline') {
+        offlineCount++;
+      }
+
+      // Calculate duration until next event or current time
+      let endTime = new Date();
+      let nextEvent: any = null;
+      
+      // Find the next event after this one
+      for (let j = i + 1; j < sortedHistory.length; j++) {
+        const nextTime = getTimestamp(sortedHistory[j].timestamp);
+        if (nextTime && nextTime > currentTime) {
+          nextEvent = sortedHistory[j];
+          break;
+        }
+      }
+
+      // Use next event time or current time
+      if (nextEvent) {
+        endTime = getTimestamp(nextEvent.timestamp) || new Date();
+      } else {
+        // If no next event, check if driver is currently in this status
+        if (current.status === 'online' && currentStatus) {
+          endTime = new Date(); // Driver is still online
+        } else if (current.status === 'offline' && !currentStatus) {
+          endTime = new Date(); // Driver is still offline
         } else {
-          offlineCount++;
-          totalOfflineMinutes += diffMinutes;
+          // Use event time as end time (duration of 0)
+          endTime = currentTime;
+        }
+      }
+
+      // Calculate duration
+      const durationMinutes = calculateDuration(currentTime, endTime);
+      
+      if (durationMinutes > 0) {
+        if (current.status === 'online') {
+          totalOnlineMinutes += durationMinutes;
+        } else if (current.status === 'offline') {
+          totalOfflineMinutes += durationMinutes;
         }
       }
     }
 
-    return { onlineCount, offlineCount, totalOnlineMinutes, totalOfflineMinutes };
+    // Calculate efficiency (based on 8-hour target)
+    const targetMinutes = 480; // 8 hours
+    let efficiency = 0;
+    if (totalOnlineMinutes > 0) {
+      efficiency = Math.min(100, (totalOnlineMinutes / targetMinutes) * 100);
+    }
+
+    return {
+      onlineCount,
+      offlineCount,
+      totalOnlineMinutes,
+      totalOfflineMinutes,
+      efficiency: Math.round(efficiency)
+    };
   };
 
   const fetchDriverActivity = async () => {
     try {
+      setLoading(true);
+      
+      // Fetch driver data
       const docRef = doc(db, 'drivers', params.id);
       const docSnap = await getDoc(docRef);
       
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setDriver(data);
-
-        // Combine all history
-        const allHistory = [
-          ...(data.onlineHistory || []).map(h => ({ ...h, status: 'online' })),
-          ...(data.offlineHistory || []).map(h => ({ ...h, status: 'offline' }))
-        ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-        // Calculate for different periods
-        const today = calculateActivity(allHistory, 'today');
-        const week = calculateActivity(allHistory, 'week');
-        const month = calculateActivity(allHistory, 'month');
-
-        setActivityData({
-          today,
-          week,
-          month
-        });
-      } else {
+      if (!docSnap.exists()) {
         toast.error('Driver not found');
         router.push('/drivers');
+        return;
       }
+
+      const data = docSnap.data();
+      setDriver({ id: docSnap.id, ...data } as Driver);
+
+      // Combine all history into a single sorted array
+      const allHistory: Array<{ timestamp: any; status: string }> = [];
+      
+      // Add online history
+      if (data.onlineHistory && Array.isArray(data.onlineHistory)) {
+        data.onlineHistory.forEach((entry: any) => {
+          allHistory.push({
+            timestamp: entry.timestamp || entry.date,
+            status: 'online'
+          });
+        });
+      }
+      
+      // Add offline history
+      if (data.offlineHistory && Array.isArray(data.offlineHistory)) {
+        data.offlineHistory.forEach((entry: any) => {
+          allHistory.push({
+            timestamp: entry.timestamp || entry.date,
+            status: 'offline'
+          });
+        });
+      }
+
+      // Sort all history by timestamp
+      allHistory.sort((a, b) => {
+        const aTime = getTimestamp(a.timestamp)?.getTime() || 0;
+        const bTime = getTimestamp(b.timestamp)?.getTime() || 0;
+        return aTime - bTime;
+      });
+
+      // Calculate for different periods
+      const currentStatus = data.isOnline || false;
+      
+      const today = calculateActivityForPeriod(allHistory, 'today', currentStatus);
+      const week = calculateActivityForPeriod(allHistory, 'week', currentStatus);
+      const month = calculateActivityForPeriod(allHistory, 'month', currentStatus);
+
+      setActivityData({
+        today,
+        week,
+        month
+      });
+
     } catch (error) {
       console.error('Error fetching driver activity:', error);
       toast.error('Failed to load driver activity');
@@ -103,11 +272,27 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
     }
   };
 
-  const formatDuration = (minutes: number) => {
+  const formatDuration = (minutes: number): string => {
+    if (minutes <= 0) return '0m';
     if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  const formatDate = (timestamp: any): string => {
+    if (!timestamp) return 'N/A';
+    const date = getTimestamp(timestamp);
+    if (!date) return 'N/A';
+    return date.toLocaleString();
+  };
+
+  const getStatusColor = (isOnline: boolean): string => {
+    return isOnline ? 'bg-green-500' : 'bg-gray-400';
+  };
+
+  const getStatusText = (isOnline: boolean): string => {
+    return isOnline ? '🟢 Online' : '⚪ Offline';
   };
 
   if (loading) {
@@ -118,13 +303,25 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
     );
   }
 
+  if (!driver) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Driver not found</p>
+        <Link href="/drivers" className="text-blue-500 hover:underline mt-2 inline-block">
+          Back to Drivers
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Driver Activity</h1>
           <p className="text-sm text-gray-500">
-            {driver?.name} - Online/Offline Activity Tracking
+            {driver.name} - Online/Offline Activity Tracking
           </p>
         </div>
         <div className="flex space-x-3">
@@ -149,20 +346,20 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className={`w-4 h-4 rounded-full ${driver?.isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+            <div className={`w-4 h-4 rounded-full ${getStatusColor(driver.isOnline)} ${driver.isOnline ? 'animate-pulse' : ''}`}></div>
             <div>
               <h2 className="text-lg font-semibold">
-                {driver?.isOnline ? '🟢 Online' : '⚪ Offline'}
+                {getStatusText(driver.isOnline)}
               </h2>
               <p className="text-sm text-gray-500">
-                Status: {driver?.status || 'Unknown'}
+                Status: {driver.status || 'Unknown'}
               </p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-500">Last Update</p>
             <p className="text-sm font-medium">
-              {driver?.lastUpdate ? new Date(driver.lastUpdate).toLocaleString() : 'Never'}
+              {driver.lastUpdate ? formatDate(driver.lastUpdate) : 'Never'}
             </p>
           </div>
         </div>
@@ -198,6 +395,12 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
                 {formatDuration(activityData.today.totalOfflineMinutes)}
               </span>
             </div>
+            <div className="flex justify-between border-t pt-2">
+              <span className="text-sm font-medium text-gray-700">Efficiency</span>
+              <span className="text-sm font-bold text-blue-600">
+                {activityData.today.efficiency || 0}%
+              </span>
+            </div>
           </div>
         </div>
 
@@ -227,6 +430,12 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
               <span className="text-sm font-medium text-gray-700">Total Offline</span>
               <span className="text-sm font-bold text-red-600">
                 {formatDuration(activityData.week.totalOfflineMinutes)}
+              </span>
+            </div>
+            <div className="flex justify-between border-t pt-2">
+              <span className="text-sm font-medium text-gray-700">Efficiency</span>
+              <span className="text-sm font-bold text-blue-600">
+                {activityData.week.efficiency || 0}%
               </span>
             </div>
           </div>
@@ -260,7 +469,41 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
                 {formatDuration(activityData.month.totalOfflineMinutes)}
               </span>
             </div>
+            <div className="flex justify-between border-t pt-2">
+              <span className="text-sm font-medium text-gray-700">Efficiency</span>
+              <span className="text-sm font-bold text-blue-600">
+                {activityData.month.efficiency || 0}%
+              </span>
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <p className="text-sm text-gray-500">Total Online Time</p>
+          <p className="text-2xl font-bold text-green-600">
+            {formatDuration(activityData.today.totalOnlineMinutes + activityData.week.totalOnlineMinutes + activityData.month.totalOnlineMinutes)}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <p className="text-sm text-gray-500">Total Offline Time</p>
+          <p className="text-2xl font-bold text-red-600">
+            {formatDuration(activityData.today.totalOfflineMinutes + activityData.week.totalOfflineMinutes + activityData.month.totalOfflineMinutes)}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <p className="text-sm text-gray-500">Current Status</p>
+          <p className="text-2xl font-bold">
+            {driver.isOnline ? '🟢 Online' : '⚪ Offline'}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <p className="text-sm text-gray-500">Average Efficiency</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {Math.round((activityData.today.efficiency + activityData.week.efficiency + activityData.month.efficiency) / 3)}%
+          </p>
         </div>
       </div>
 
@@ -272,28 +515,52 @@ export default function DriverActivityPage({ params }: { params: { id: string } 
         </div>
         <div className="p-6">
           <div className="max-h-96 overflow-y-auto">
-            {[...(driver?.onlineHistory || []), ...(driver?.offlineHistory || [])]
-              .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-              .slice(0, 50)
-              .map((entry, index) => (
-                <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100">
-                  <div className="flex items-center space-x-3">
-                    <span className={entry.status === 'online' ? 'text-green-500' : 'text-red-500'}>
-                      {entry.status === 'online' ? '🟢' : '⚪'}
-                    </span>
-                    <span className="text-sm font-medium">
-                      {entry.status === 'online' ? 'Went Online' : 'Went Offline'}
-                    </span>
+            {(() => {
+              // Combine and sort history
+              const allEvents: Array<{ timestamp: any; status: string; date: string; time: string }> = [
+                ...(driver.onlineHistory || []).map(h => ({ ...h, status: 'online' })),
+                ...(driver.offlineHistory || []).map(h => ({ ...h, status: 'offline' }))
+              ];
+              
+              allEvents.sort((a, b) => {
+                const aTime = getTimestamp(a.timestamp)?.getTime() || 0;
+                const bTime = getTimestamp(b.timestamp)?.getTime() || 0;
+                return bTime - aTime; // Newest first
+              });
+
+              if (allEvents.length === 0) {
+                return (
+                  <p className="text-center text-gray-500 py-8">No activity recorded yet</p>
+                );
+              }
+
+              return allEvents.slice(0, 50).map((entry, index) => {
+                const timestamp = getTimestamp(entry.timestamp);
+                const isOnline = entry.status === 'online';
+                
+                return (
+                  <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center space-x-3">
+                      <span className={isOnline ? 'text-green-500' : 'text-red-500'}>
+                        {isOnline ? '🟢' : '⚪'}
+                      </span>
+                      <span className="text-sm font-medium">
+                        {isOnline ? 'Went Online' : 'Went Offline'}
+                      </span>
+                      {!entry.date && !entry.time && (
+                        <span className="text-xs text-gray-400">
+                          {timestamp ? formatDate(timestamp) : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {entry.date && entry.time ? `${entry.date} at ${entry.time}` : 
+                       timestamp ? formatDate(timestamp) : 'N/A'}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {entry.date} at {entry.time}
-                  </div>
-                </div>
-              ))}
-            {(!driver?.onlineHistory || driver.onlineHistory.length === 0) && 
-             (!driver?.offlineHistory || driver.offlineHistory.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No activity recorded yet</p>
-            )}
+                );
+              });
+            })()}
           </div>
         </div>
       </div>

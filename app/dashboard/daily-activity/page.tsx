@@ -372,10 +372,10 @@ export default function DailyActivityPage() {
         // Get the checkpoint (when we last saved) or the offline start time
         const checkpoint = getTimestamp(activity.lastAccumulatedAt);
         const offlineStart = getTimestamp(activity.offlineStart);
-        
+
         // Use checkpoint if available, otherwise use offlineStart
         const start = checkpoint || offlineStart;
-        
+
         if (start) {
           const diffMs = now.getTime() - start.getTime();
           if (diffMs > 0) {
@@ -390,7 +390,7 @@ export default function DailyActivityPage() {
       // Format the total offline minutes as hours and minutes
       const hours = Math.floor(totalOfflineMinutes / 60);
       const minutes = totalOfflineMinutes % 60;
-      
+
       // Return in a consistent format
       if (hours > 0) {
         return `${hours}h ${minutes}m`;
@@ -419,17 +419,17 @@ export default function DailyActivityPage() {
   ): Date => {
     const candidates = isOnline
       ? [
-          driverData?.onlineSince,
-          driverData?.onlineStart,
-          driverData?.lastOnlineTime,
-          driverData?.statusChangedAt,
-        ]
+        driverData?.onlineSince,
+        driverData?.onlineStart,
+        driverData?.lastOnlineTime,
+        driverData?.statusChangedAt,
+      ]
       : [
-          driverData?.offlineSince,
-          driverData?.offlineStart,
-          driverData?.lastOfflineTime,
-          driverData?.statusChangedAt,
-        ];
+        driverData?.offlineSince,
+        driverData?.offlineStart,
+        driverData?.lastOfflineTime,
+        driverData?.statusChangedAt,
+      ];
 
     for (const candidate of candidates) {
       const parsed = getTimestamp(candidate);
@@ -547,15 +547,15 @@ export default function DailyActivityPage() {
           // First observation of this driver for today.
           // Get the status start time from the driver document or fallback to now
           const statusStart = getDriverStatusStart(latestDriverData, isOnline, now, todayStr);
-          
+
           // Calculate time from midnight to the status start time
           const midnight = getMidnightToday(todayStr);
-          
+
           // If the driver has been in this status since before midnight,
           // we need to count time from midnight to now
           let elapsedMinutesFromMidnight = 0;
           const startTime = statusStart < midnight ? midnight : statusStart;
-          
+
           // If the driver was already in this status at midnight, count from midnight
           if (statusStart <= midnight) {
             const diffMs = now.getTime() - midnight.getTime();
@@ -1072,7 +1072,8 @@ export default function DailyActivityPage() {
   };
 
   // ============================================================
-  // TOTAL HOURS  // ============================================================
+  // TOTAL HOURS
+  // ============================================================
 
   const calculateTotalHoursForDisplay = (
     activity: DailyActivity
@@ -1082,7 +1083,7 @@ export default function DailyActivityPage() {
   };
 
   // ============================================================
-  // STATUS DETAILS
+  // STATUS DETAILS - FIXED TO SHOW TOTAL TIME FROM MIDNIGHT
   // ============================================================
 
   const getStatusDetails = (
@@ -1092,27 +1093,216 @@ export default function DailyActivityPage() {
     duration: string;
     startTime: string;
   } => {
-    if (activity.isOnline && activity.onlineStart) {
-      const duration = calculateDuration(activity.onlineStart);
+    const now = currentTime;
+
+    if (activity.isOnline) {
+      // Calculate TOTAL online time from midnight to now
+      let totalOnlineMinutes = Math.max(0, activity.totalMinutes || 0);
+
+      // Add current session time if online
+      const checkpoint = getTimestamp(activity.lastAccumulatedAt);
+      const start = checkpoint || getTimestamp(activity.onlineStart);
+      if (start) {
+        const diffMs = now.getTime() - start.getTime();
+        if (diffMs > 0) {
+          totalOnlineMinutes += Math.floor(diffMs / 60000);
+        }
+      }
+
+      const hours = Math.floor(totalOnlineMinutes / 60);
+      const minutes = totalOnlineMinutes % 60;
+      const duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
       return {
         status: 'Online',
         duration: duration,
         startTime: formatTime(activity.onlineStart),
       };
     }
-    if (!activity.isOnline && activity.offlineStart) {
-      const duration = calculateDuration(activity.offlineStart);
+
+    if (!activity.isOnline) {
+      // Calculate TOTAL offline time from midnight to now
+      let totalOfflineMinutes = Math.max(0, activity.totalOfflineMinutes || 0);
+
+      // Add current session time if offline
+      const checkpoint = getTimestamp(activity.lastAccumulatedAt);
+      const start = checkpoint || getTimestamp(activity.offlineStart);
+      if (start) {
+        const diffMs = now.getTime() - start.getTime();
+        if (diffMs > 0) {
+          totalOfflineMinutes += Math.floor(diffMs / 60000);
+        }
+      }
+
+      const hours = Math.floor(totalOfflineMinutes / 60);
+      const minutes = totalOfflineMinutes % 60;
+      const duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
       return {
         status: 'Offline',
         duration: duration,
         startTime: formatTime(activity.offlineStart),
       };
     }
+
     return {
       status: 'Unknown',
       duration: 'N/A',
       startTime: 'N/A',
     };
+  };
+
+  // ============================================================
+  // ENHANCED: GET FULL TIMELINE FOR TOOLTIP
+  // ============================================================
+
+  const getFullTimeline = (activity: DailyActivity): string[] => {
+    const now = currentTime;
+    const timelineItems: string[] = [];
+
+    // Combine all history
+    const allHistory = [
+      ...(activity.onlineHistory || []).map(h => ({ ...h, status: 'online' })),
+      ...(activity.offlineHistory || []).map(h => ({ ...h, status: 'offline' }))
+    ].sort((a, b) => {
+      const aTime = getTimestamp(a.timestamp)?.getTime() || 0;
+      const bTime = getTimestamp(b.timestamp)?.getTime() || 0;
+      return aTime - bTime;
+    });
+
+    // If no history, show current status
+    if (allHistory.length === 0) {
+      if (activity.isOnline && activity.onlineStart) {
+        const start = getTimestamp(activity.onlineStart);
+        if (start) {
+          const diffMs = now.getTime() - start.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          const hours = Math.floor(diffMins / 60);
+          const mins = diffMins % 60;
+          const duration = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+          timelineItems.push(`🟢 Online since ${start.toLocaleTimeString()} (${duration})`);
+        }
+      } else if (!activity.isOnline && activity.offlineStart) {
+        const start = getTimestamp(activity.offlineStart);
+        if (start) {
+          const diffMs = now.getTime() - start.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          const hours = Math.floor(diffMins / 60);
+          const mins = diffMins % 60;
+          const duration = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+          timelineItems.push(`⚪ Offline since ${start.toLocaleTimeString()} (${duration})`);
+        }
+      }
+      return timelineItems;
+    }
+
+    // Build timeline from history
+    allHistory.forEach((entry, index) => {
+      const timestamp = getTimestamp(entry.timestamp);
+      if (!timestamp) return;
+
+      const timeStr = timestamp.toLocaleTimeString();
+      const statusEmoji = entry.status === 'online' ? '🟢' : '⚪';
+      const statusText = entry.status === 'online' ? 'Online' : 'Offline';
+
+      // Calculate duration until next event or now
+      let duration = '';
+      if (index < allHistory.length - 1) {
+        const nextTime = getTimestamp(allHistory[index + 1].timestamp);
+        if (nextTime) {
+          const diffMs = nextTime.getTime() - timestamp.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          if (diffMins > 0) {
+            const hours = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+            duration = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+          }
+        }
+      } else {
+        // Last event - calculate duration to now if it's the current status
+        if ((entry.status === 'online' && activity.isOnline) ||
+          (entry.status === 'offline' && !activity.isOnline)) {
+          const diffMs = now.getTime() - timestamp.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          if (diffMins > 0) {
+            const hours = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+            duration = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+          }
+        }
+      }
+
+      timelineItems.push(`${timeStr} ${statusEmoji} ${statusText}${duration ? ` (${duration})` : ''}`);
+    });
+
+    return timelineItems;
+  };
+
+  // ============================================================
+  // ENHANCED: RENDER TIMES WITH TOOLTIP
+  // ============================================================
+
+  const renderTimesWithTooltip = (activity: DailyActivity) => {
+    const timeline = getFullTimeline(activity);
+    const hasTimeline = timeline.length > 0;
+
+    return (
+      <div className="relative group">
+        {/* Main display - simple view */}
+        <div className="flex flex-col space-y-1">
+          {activity.isOnline ? (
+            <>
+              <span className="text-xs text-green-600 font-medium">
+                Online since: {formatTime(activity.onlineStart)}
+              </span>
+              {activity.offlineStart && (
+                <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
+                  Last offline: {formatTime(activity.offlineStart)}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-red-600 font-medium">
+                Offline since: {formatTime(activity.offlineStart)}
+              </span>
+              {activity.onlineStart && (
+                <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
+                  Last online: {formatTime(activity.onlineStart)}
+                </span>
+              )}
+            </>
+          )}
+          {!activity.onlineStart && !activity.offlineStart && (
+            <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              No activity recorded
+            </span>
+          )}
+        </div>
+
+        {/* Tooltip - shows full timeline on hover */}
+        {hasTimeline && (
+          <div className={`absolute left-0 top-full mt-1 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 min-w-[200px] max-w-xs rounded-lg shadow-xl border p-3 ${userBackground === 'dark'
+              ? 'bg-gray-800 border-gray-600 text-white'
+              : 'bg-white border-gray-200 text-gray-900'
+            }`}>
+            <div className={`text-xs font-medium mb-2 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              📋 Full Day Timeline
+            </div>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {timeline.map((item, idx) => (
+                <div key={idx} className={`text-xs ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'} py-0.5 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} last:border-0`}>
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className={`text-[10px] ${userBackground === 'dark' ? 'text-gray-500' : 'text-gray-400'} mt-1 text-center border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} pt-1`}>
+              Hover to see full timeline
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // ============================================================
@@ -1238,11 +1428,10 @@ export default function DailyActivityPage() {
             <button
               onClick={refreshData}
               disabled={refreshing}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-                refreshing
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${refreshing
                   ? 'bg-gray-400 cursor-not-allowed text-white'
                   : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
+                }`}
             >
               {refreshing ? (
                 <>
@@ -1298,17 +1487,15 @@ export default function DailyActivityPage() {
 
         {/* REAL-TIME STATUS */}
         <div
-          className={`rounded-xl p-3 flex items-center justify-between ${
-            userBackground === 'dark'
+          className={`rounded-xl p-3 flex items-center justify-between ${userBackground === 'dark'
               ? 'bg-blue-900/30 border border-blue-700 text-blue-200'
               : 'bg-blue-50 border border-blue-200 text-blue-700'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-2">
             <div
-              className={`w-2 h-2 rounded-full ${
-                refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'
-              }`}
+              className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'
+                }`}
             />
             <span className={`text-sm ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
               {refreshing ? '🔄 Refreshing data...' : '✅ Live updates: Driver status auto-syncs from database'}
@@ -1381,14 +1568,12 @@ export default function DailyActivityPage() {
 
         {/* ACTIVITY TABLE */}
         <div
-          className={`rounded-xl shadow-sm border overflow-hidden ${
-            userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
-          } ${getCardClass()}`}
+          className={`rounded-xl shadow-sm border overflow-hidden ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
+            } ${getCardClass()}`}
         >
           <div
-            className={`p-6 border-b ${
-              userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'
-            } flex justify-between items-center`}
+            className={`p-6 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'
+              } flex justify-between items-center`}
           >
             <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Driver Activity - {formatDate(selectedDate)}
@@ -1450,7 +1635,7 @@ export default function DailyActivityPage() {
                   filteredActivities.map((activity) => {
                     const statusInfo = getStatusDetails(activity);
                     const offlineDuration = calculateOfflineDuration(activity);
-                    
+
                     // ============================================================
                     // EFFICIENCY - Based on total online time vs target 8 hours
                     // ============================================================
@@ -1473,7 +1658,7 @@ export default function DailyActivityPage() {
                     }
 
                     efficiency = Math.min(100, Math.max(0, efficiency));
-                    
+
                     const onlineSessions = activity.onlineSessions || 0;
                     const offlineSessions = activity.offlineSessions || 0;
                     const totalSwitches = activity.totalSwitches || 0;
@@ -1530,7 +1715,7 @@ export default function DailyActivityPage() {
                           {getStatusBadge(activity.isOnline)}
                         </td>
 
-                        {/* CURRENT DURATION */}
+                        {/* CURRENT DURATION - NOW SHOWS TOTAL TIME FROM MIDNIGHT */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`text-sm font-semibold ${activity.isOnline ? 'text-green-600' : 'text-red-600'}`}>
                             {statusInfo.duration}
@@ -1557,38 +1742,9 @@ export default function DailyActivityPage() {
                           </div>
                         </td>
 
-                        {/* TIMES */}
+                        {/* TIMES - ENHANCED WITH TOOLTIP */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-col space-y-1">
-                            {activity.isOnline ? (
-                              <>
-                                <span className="text-xs text-green-600 font-medium">
-                                  Online since: {formatTime(activity.onlineStart)}
-                                </span>
-                                {activity.offlineStart && (
-                                  <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
-                                    Last offline: {formatTime(activity.offlineStart)}
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-xs text-red-600 font-medium">
-                                  Offline since: {formatTime(activity.offlineStart)}
-                                </span>
-                                {activity.onlineStart && (
-                                  <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
-                                    Last online: {formatTime(activity.onlineStart)}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            {!activity.onlineStart && !activity.offlineStart && (
-                              <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                                No activity recorded
-                              </span>
-                            )}
-                          </div>
+                          {renderTimesWithTooltip(activity)}
                         </td>
 
                         {/* TOTAL HOURS */}
@@ -1628,9 +1784,8 @@ export default function DailyActivityPage() {
 
         {/* SUMMARY FOOTER */}
         <div
-          className={`rounded-xl shadow-sm p-4 border ${
-            userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
-          } ${getCardClass()}`}
+          className={`rounded-xl shadow-sm p-4 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
+            } ${getCardClass()}`}
         >
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4 bg-cyan-700 text-center">
             <div>
@@ -1666,7 +1821,15 @@ export default function DailyActivityPage() {
                 Total Sessions
               </p>
               <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
-                {filteredActivities.reduce((sum, a) => sum + (a.onlineSessions || 0) + (a.offlineSessions || 0), 0)}
+                {filteredActivities.reduce((sum, a) => {
+                  const online = a.onlineSessions || 0;
+                  const offline = a.offlineSessions || 0;
+                  // If no sessions recorded but driver exists, count as 1 (current status)
+                  if (online === 0 && offline === 0 && a.driverId) {
+                    return sum + 1;
+                  }
+                  return sum + online + offline;
+                }, 0)}
               </p>
             </div>
             <div>

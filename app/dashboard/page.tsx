@@ -259,11 +259,11 @@ export default function Dashboard() {
     <>
       <style>{`
         body, .dashboard-container, .dashboard-main-inner, button, a, p, h1, h2, h3, h4, span, li {
-          font-size: 14px;
+          font-size: 15px;
         }
         @media (max-width: 768px) {
           body, .dashboard-container, .dashboard-main-inner, button, a, p, h1, h2, h3, h4, span, li {
-            font-size: 12px;
+            font-size: 13px;
           }
         }
 
@@ -288,11 +288,11 @@ export default function Dashboard() {
         }
         
         .text-gray-800.font-semibold.text-lg {
-          font-size: 0.9rem !important;
+          font-size: 1rem !important;
         }
         
         .text-gray-500.text-sm.mt-1 {
-          font-size: 0.7rem !important;
+          font-size: 0.8rem !important;
         }
         
         .mt-6.p-5.bg-indigo-50.rounded-xl {
@@ -300,12 +300,12 @@ export default function Dashboard() {
         }
         
         .text-gray-800.text-base {
-          font-size: 0.85rem !important;
+          font-size: 0.95rem !important;
         }
         
         button.px-4.py-2 {
           padding: 0.3rem 0.75rem !important;
-          font-size: 0.75rem !important;
+          font-size: 0.85rem !important;
         }
 
         @media (min-width: 769px) {
@@ -316,7 +316,7 @@ export default function Dashboard() {
             padding: 1.5rem !important;
           }
           body, .dashboard-container, .dashboard-main-inner, button, a, p, span, li {
-            font-size: 15px;
+            font-size: 16px;
           }
         }
 
@@ -387,7 +387,7 @@ export default function Dashboard() {
           color: white;
           font-weight: 600;
           font-family: system-ui, -apple-system, 'Segoe UI', Roboto;
-          font-size: 13px;
+          font-size: 14px;
         }
         
         .mobile-menu-btn svg {
@@ -397,7 +397,7 @@ export default function Dashboard() {
         }
         
         .mobile-menu-btn span {
-          font-size: 13px;
+          font-size: 14px;
           letter-spacing: 0.3px;
         }
         
@@ -458,7 +458,7 @@ export default function Dashboard() {
           background: white !important;
           z-index: 10 !important;
           font-weight: 700;
-          font-size: 13px;
+          font-size: 14px;
           color: #1877F2;
           padding-right: 10px;
           margin-right: 6px;
@@ -477,7 +477,7 @@ export default function Dashboard() {
           background: #f3f4f6;
           border-radius: 30px;
           transition: all 0.2s ease;
-          font-size: 12px;
+          font-size: 13px;
           flex-shrink: 0;
           white-space: nowrap;
         }
@@ -539,7 +539,7 @@ export default function Dashboard() {
           text-decoration: none;
           border-radius: 30px;
           transition: all 0.2s ease;
-          font-size: 12px;
+          font-size: 13px;
           background: white;
           flex-shrink: 0;
           white-space: nowrap;
@@ -564,7 +564,7 @@ export default function Dashboard() {
         /* Desktop original styles */
         .menu-logo {
           font-weight: bold;
-          font-size: 1.1rem;
+          font-size: 1.2rem;
           color: #FFD700;
           padding-right: 1rem;
           border-right: 1px solid #e5e7eb;
@@ -581,6 +581,7 @@ export default function Dashboard() {
           transition: all 0.2s ease;
           flex-shrink: 0;
           white-space: nowrap;
+          font-size: 0.95rem;
         }
         
         .top-menu-item:hover {
@@ -638,7 +639,7 @@ export default function Dashboard() {
           text-decoration: none;
           border-radius: 0.5rem;
           transition: all 0.2s ease;
-          font-size: 0.875rem;
+          font-size: 0.95rem;
           flex-shrink: 0;
           white-space: nowrap;
           cursor: pointer;
@@ -853,12 +854,12 @@ export default function Dashboard() {
           <div className={`rounded-2xl shadow-sm border p-6 dashboard-main-inner ${getCardClass()}`}>
             {showBranchSelection ? (
               <div className="space-y-6">
-                <h2 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-800'}`}>Select a Branch</h2>
+                <h2 className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-800'}`}>Select a Branch</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {branches.map((branch) => (
                     <button key={branch.id} onClick={() => handleBranchSelect(branch)} className={`${userBackground === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-50 hover:bg-indigo-50 text-gray-800'} transition-all p-5 rounded-xl text-left border ${userBackground === 'dark' ? 'border-gray-600 hover:border-gray-500' : 'border-gray-200 hover:border-indigo-200'} shadow-sm hover:shadow`}>
-                      <div className={`font-semibold text-lg ${userBackground === 'dark' ? 'text-white' : 'text-gray-800'}`}>{branch.name}</div>
-                      <div className={`text-sm mt-1 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Click to view student count</div>
+                      <div className={`font-semibold text-xl ${userBackground === 'dark' ? 'text-white' : 'text-gray-800'}`}>{branch.name}</div>
+                      <div className={`text-base mt-1 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Click to view student count</div>
                     </button>
                   ))}
                 </div>
@@ -878,8 +879,8 @@ export default function Dashboard() {
               <div className="space-y-6 pb-20">
                 {/* Header */}
                 <div>
-                  <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Dashboard</h1>
-                  <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Welcome, {user?.displayName || user?.email || 'User'}!</p>
+                  <h1 className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Dashboard</h1>
+                  <p className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Welcome, {user?.displayName || user?.email || 'User'}!</p>
                 </div>
 
                 {/* Stats Grid */}
@@ -887,8 +888,8 @@ export default function Dashboard() {
                   <div className="rounded-xl shadow-sm p-6 border bg-green-400 border-green-300">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-800">Total Drivers</p>
-                        <p className="text-2xl font-bold mt-1 text-gray-900">0</p>
+                        <p className="text-base font-medium text-gray-800">Total Drivers</p>
+                        <p className="text-3xl font-bold mt-1 text-gray-900">0</p>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-green-200 flex items-center justify-center">
                         <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -901,8 +902,8 @@ export default function Dashboard() {
                   <div className="rounded-xl shadow-sm p-6 border bg-blue-400 border-blue-300">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-800">Total Orders</p>
-                        <p className="text-2xl font-bold mt-1 text-gray-900">0</p>
+                        <p className="text-base font-medium text-gray-800">Total Orders</p>
+                        <p className="text-3xl font-bold mt-1 text-gray-900">0</p>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center">
                         <svg className="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -915,8 +916,8 @@ export default function Dashboard() {
                   <div className="rounded-xl shadow-sm p-6 border bg-yellow-400 border-yellow-300">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-800">Total Revenue</p>
-                        <p className="text-2xl font-bold mt-1 text-gray-900">KES 0</p>
+                        <p className="text-base font-medium text-gray-800">Total Revenue</p>
+                        <p className="text-3xl font-bold mt-1 text-gray-900">KES 0</p>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-yellow-200 flex items-center justify-center">
                         <svg className="w-6 h-6 text-yellow-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -929,8 +930,8 @@ export default function Dashboard() {
                   <div className="rounded-xl shadow-sm p-6 border bg-red-400 border-red-300">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-800">Fuel Sold</p>
-                        <p className="text-2xl font-bold mt-1 text-gray-900">0L</p>
+                        <p className="text-base font-medium text-gray-800">Fuel Sold</p>
+                        <p className="text-3xl font-bold mt-1 text-gray-900">0L</p>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-red-200 flex items-center justify-center">
                         <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">

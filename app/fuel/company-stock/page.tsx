@@ -121,40 +121,40 @@ export default function CompanyFuelStock() {
 
   return (
     <div className={`p-4 md:p-6 transition-colors duration-300 ${getBackgroundClass()}`}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="w-full max-w-full mx-auto space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}> Main Tank Stock</h1>
-            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <h1 className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}> Main Tank Stock</h1>
+            <p className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               Real-time fuel stock levels from main tanks
             </p>
           </div>
-          <Link href="/fuel" className={`text-sm ${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} flex items-center space-x-1`}>
+          <Link href="/fuel" className={`text-base ${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} flex items-center space-x-1`}>
             <span>←</span>
             <span>Back to Fuel</span>
           </Link>
         </div>
 
        {/* Overall Stock Status */}
-<div className={`rounded-xl shadow-lg p-6 border ${userBackground === 'dark' ? 'bg-blue-800' : 'bg-gradient-to-br from-blue-800 to-cyan-900 border-blue-200'} hover:shadow-xl transition-all duration-300`}>
+<div className={`rounded-xl shadow-lg p-6 border ${userBackground === 'dark' ? 'bg-blue-800' : 'bg-gradient-to-br from-blue-800 to-cyan-900 border-blue-200'} hover:shadow-xl transition-all duration-300 w-full`}>
   {/* CHANGE 1: Added gradient backgrounds (to-br from-blue to-cyan) for depth, hover shadow, and transition */}
   
   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
     <div>
-      <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-red-600'}`}> Total Fuel Stock</h2>
-      <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-900'}`}>Total Capacity: {totalCapacity.toLocaleString()} Liters</p>
+      <h2 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-red-600'}`}> Total Fuel Stock</h2>
+      <p className={`text-base ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-900'}`}>Total Capacity: {totalCapacity.toLocaleString()} Liters</p>
       {/* CHANGE 2: Dark mode text color from 'text-gray-400' to 'text-gray-300' for better contrast */}
     </div>
-    <div className="flex items-center space-x-4">
-      <span className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-400'}`}>
+    <div className="flex flex-wrap items-center space-x-4">
+      <span className={`text-4xl font-bold ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-400'}`}>
         {/* CHANGE 3: Text size from 'text-2xl' to 'text-3xl' for better visibility */}
         {/* CHANGE 4: Dark mode text color from 'text-blue-400' to 'text-blue-300' for better contrast */}
         {total.toFixed(1)}L
       </span>
-      <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-red-600'}`}>
+      <span className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-red-600'}`}>
         / {totalCapacity.toLocaleString()}L
       </span>
-      <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${
+      <span className={`px-4 py-1.5 rounded-full text-base font-semibold ${
         /* CHANGE 5: Padding increased from 'px-3 py-1' to 'px-4 py-1.5' for better touch target */
         /* CHANGE 6: Font weight from 'font-medium' to 'font-semibold' for better readability */
         overallPercentage >= 100 ? 'bg-red-500 text-white' :
@@ -171,7 +171,7 @@ export default function CompanyFuelStock() {
   </div>
   
   <div className="mt-4">
-    <div className={`w-full rounded-full h-4 overflow-hidden ${userBackground === 'dark' ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
+    <div className={`w-full rounded-full h-5 overflow-hidden ${userBackground === 'dark' ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
       {/* CHANGE 8: Progress bar background from 'bg-gray-700' to 'bg-gray-700/50' for transparency in dark mode */}
       {/* CHANGE 9: Light mode background from 'bg-white' to 'bg-gray-100' for better visibility */}
       
@@ -193,7 +193,7 @@ export default function CompanyFuelStock() {
   </div>
   
   {lastUpdated && (
-    <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-800'} mt-3`}>
+    <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-800'} mt-3`}>
       {/* CHANGE 14: Margin top from 'mt-2' to 'mt-3' for better spacing */}
       {/* CHANGE 15: Added clock emoji for visual cue */}
       🕐 Last updated: {new Date(lastUpdated).toLocaleString()}
@@ -202,23 +202,23 @@ export default function CompanyFuelStock() {
 </div>
 
         {/* Fuel Stock Table - View Only */}
-        <div className={`rounded-xl shadow-sm border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
-          <div className={`p-4 border-b ${userBackground === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-            <div className="flex items-center justify-between">
-              <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}> Current Main Tank Levels</h2>
-              <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>🔒 View Only - Managed via Imports</span>
+        <div className={`rounded-xl shadow-sm border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()} w-full`}>
+          <div className={`p-4 border-b ${userBackground === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'} flex flex-wrap items-center justify-between gap-4`}>
+            <div className="flex flex-wrap items-center justify-between gap-4 w-full">
+              <h2 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}> Current Main Tank Levels</h2>
+              <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>🔒 View Only - Managed via Imports</span>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[600px]">
               <thead className={userBackground === 'dark' ? 'bg-red-900' : 'bg-red-900'}>
                 <tr>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Fuel Type</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Current Stock (L)</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Capacity (L)</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Status</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Percentage</th>
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Fuel Type</th>
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Current Stock (L)</th>
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Capacity (L)</th>
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Status</th>
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>Percentage</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${userBackground === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
@@ -231,29 +231,29 @@ export default function CompanyFuelStock() {
                   return (
                     <tr key={fuelType} className={userBackground === 'dark' ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50'}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <span className={`font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{fuelType}</span>
-                          <span className={`px-2 py-1 text-xs rounded-full ${status.bg} ${status.color}`}>
+                        <div className="flex flex-wrap items-center space-x-2">
+                          <span className={`font-semibold text-base ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{fuelType}</span>
+                          <span className={`px-3 py-1 text-sm rounded-full ${status.bg} ${status.color}`}>
                             {status.label}
                           </span>
                           {isFull && (
-                            <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-600 font-bold animate-pulse">
+                            <span className="px-3 py-1 text-sm rounded-full bg-red-100 text-red-600 font-bold animate-pulse">
                               🚫 FULL
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{amount.toFixed(1)}L</span>
+                        <span className={`text-base font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>{amount.toFixed(1)}L</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>100,000L</span>
+                        <span className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>100,000L</span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
-                          <div className={`w-24 rounded-full h-2 ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                          <div className={`w-24 rounded-full h-2.5 ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
                             <div 
-                              className={`h-2 rounded-full ${
+                              className={`h-2.5 rounded-full ${
                                 isFull ? 'bg-red-500' :
                                 percentage >= 80 ? 'bg-green-500' :
                                 percentage >= 50 ? 'bg-yellow-500' :
@@ -263,11 +263,11 @@ export default function CompanyFuelStock() {
                               style={{ width: `${Math.min(percentage, 100)}%` }}
                             />
                           </div>
-                          <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{percentage.toFixed(0)}%</span>
+                          <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{percentage.toFixed(0)}%</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        <span className={`text-base font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                           {percentage.toFixed(1)}%
                         </span>
                       </td>
@@ -280,21 +280,21 @@ export default function CompanyFuelStock() {
         </div>
 
         {/* Info Section */}
-        <div className={`p-4 rounded-lg border ${userBackground === 'dark' ? 'bg-cyan-500/30 border-cyan-700 text-cyan-200' : 'bg-cyan-700 border-cyan-200 text-cyan-700'}`}>
+        <div className={`p-4 rounded-lg border ${userBackground === 'dark' ? 'bg-cyan-500/30 border-cyan-700 text-cyan-200' : 'bg-cyan-700 border-cyan-200 text-cyan-700'} w-full`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center space-x-4">
-              <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-100' : 'text-gray-200'}`}>ℹ️ Information:</span>
-              <span className={`text-sm ${userBackground === 'dark' ? 'text-cyan-300' : 'text-cyan-300'}`}>Fuel levels are automatically managed through imports</span>
+            <div className="flex flex-wrap items-center space-x-4">
+              <span className={`text-base font-medium ${userBackground === 'dark' ? 'text-gray-100' : 'text-gray-200'}`}>ℹ️ Information:</span>
+              <span className={`text-base ${userBackground === 'dark' ? 'text-cyan-300' : 'text-cyan-300'}`}>Fuel levels are automatically managed through imports</span>
             </div>
-            <div className={`text-sm ${userBackground === 'dark' ? 'text-cyan-300' : 'text-cyan-300'}`}>
+            <div className={`text-base ${userBackground === 'dark' ? 'text-cyan-300' : 'text-cyan-300'}`}>
               💡 Fuel is added only via the Import Fuel page
             </div>
           </div>
         </div>
 
         {/* Legend */}
-        <div className={`rounded-lg p-4 border ${userBackground === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-          <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className={`rounded-lg p-4 border ${userBackground === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'} w-full`}>
+          <div className="flex flex-wrap items-center gap-4 text-base">
             <span className={`font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Status Legend:</span>
             <span className="flex items-center space-x-1">
               <span className="w-3 h-3 bg-red-500 rounded-full"></span>

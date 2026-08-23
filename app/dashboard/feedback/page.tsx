@@ -103,9 +103,9 @@ const StarRating = ({
   );
 
   const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-5 h-5',
-    lg: 'w-6 h-6',
+    sm: 'w-5 h-5',
+    md: 'w-6 h-6',
+    lg: 'w-7 h-7',
   };
 
   const starClass = sizeClasses[size] || sizeClasses.sm;
@@ -175,28 +175,28 @@ const FeedbackSkeleton = ({
     >
       <div className="grid grid-cols-12 gap-3">
         <div className="col-span-3 space-y-1.5">
-          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4" />
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+          <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded w-3/4" />
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
         </div>
 
         <div className="col-span-3">
-          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-5/6" />
+          <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded w-5/6" />
         </div>
 
         <div className="col-span-2">
-          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-2/3" />
+          <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded w-2/3" />
         </div>
 
         <div className="col-span-1 flex justify-center">
-          <div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded" />
+          <div className="h-5 w-16 bg-gray-300 dark:bg-gray-600 rounded" />
         </div>
 
         <div className="col-span-2">
-          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4" />
+          <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded w-3/4" />
         </div>
 
         <div className="col-span-1 flex justify-center">
-          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded-full" />
+          <div className="h-5 w-5 bg-gray-300 dark:bg-gray-600 rounded-full" />
         </div>
       </div>
     </div>
@@ -295,7 +295,7 @@ const StatsSummary = ({
     >
       <div className="text-center">
         <p
-          className={`text-2xl font-bold ${
+          className={`text-3xl font-bold ${
             userBackground === 'dark'
               ? 'text-white'
               : 'text-gray-900'
@@ -305,7 +305,7 @@ const StatsSummary = ({
         </p>
 
         <p
-          className={`text-sm ${
+          className={`text-base ${
             userBackground === 'dark'
               ? 'text-gray-400'
               : 'text-gray-500'
@@ -321,7 +321,7 @@ const StatsSummary = ({
         </div>
 
         <p
-          className={`text-base font-bold mt-1 ${
+          className={`text-lg font-bold mt-1 ${
             userBackground === 'dark'
               ? 'text-white'
               : 'text-gray-900'
@@ -331,7 +331,7 @@ const StatsSummary = ({
         </p>
 
         <p
-          className={`text-sm ${
+          className={`text-base ${
             userBackground === 'dark'
               ? 'text-gray-400'
               : 'text-gray-500'
@@ -342,12 +342,12 @@ const StatsSummary = ({
       </div>
 
       <div className="text-center">
-        <p className="text-2xl font-bold text-yellow-500">
+        <p className="text-3xl font-bold text-yellow-500">
           {ratingDistribution[4] || 0}
         </p>
 
         <p
-          className={`text-sm ${
+          className={`text-base ${
             userBackground === 'dark'
               ? 'text-gray-400'
               : 'text-gray-500'
@@ -359,7 +359,7 @@ const StatsSummary = ({
 
       <div className="text-center">
         <p
-          className={`text-2xl font-bold ${
+          className={`text-3xl font-bold ${
             unread > 0
               ? 'text-red-500 animate-pulse'
               : userBackground === 'dark'
@@ -371,7 +371,7 @@ const StatsSummary = ({
         </p>
 
         <p
-          className={`text-sm ${
+          className={`text-base ${
             userBackground === 'dark'
               ? 'text-gray-400'
               : 'text-gray-500'
@@ -1426,17 +1426,16 @@ export default function FeedbackPage() {
       >
         <div className="max-w-full mx-auto space-y-4">
           <div className="flex items-center justify-between">
-            <div className="h-7 bg-gray-300 dark:bg-gray-700 rounded w-40 animate-pulse" />
-
+            <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded w-48 animate-pulse" />
             <div className="flex gap-3">
-              <div className="h-9 w-24 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
-              <div className="h-9 w-24 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-10 w-28 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-10 w-28 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
             </div>
           </div>
 
-          <div className="h-24 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-28 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
 
-          <div className="h-12 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-14 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
 
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -1467,7 +1466,7 @@ export default function FeedbackPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1
-              className={`text-xl font-bold ${
+              className={`text-2xl font-bold ${
                 userBackground === 'dark'
                   ? 'text-white'
                   : 'text-gray-900'
@@ -1476,7 +1475,7 @@ export default function FeedbackPage() {
               📝 Feedback
 
               {unreadCount > 0 && (
-                <span className="ml-2 px-2.5 py-0.5 text-sm bg-red-500 text-white rounded-full animate-pulse">
+                <span className="ml-2 px-2.5 py-0.5 text-base bg-red-500 text-white rounded-full animate-pulse">
                   {unreadCount} new
                 </span>
               )}
@@ -1493,7 +1492,7 @@ export default function FeedbackPage() {
                       : 'unread'
                   )
                 }
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
+                className={`px-3 py-1.5 text-base font-medium rounded-lg transition ${
                   filter === 'unread'
                     ? 'bg-red-500 text-white'
                     : 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -1507,7 +1506,7 @@ export default function FeedbackPage() {
               onClick={() =>
                 setShowStats(!showStats)
               }
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
+              className={`px-3 py-1.5 text-base font-medium rounded-lg transition ${
                 userBackground === 'dark'
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1520,21 +1519,21 @@ export default function FeedbackPage() {
             <button
               onClick={markAllAsRead}
               disabled={unreadCount === 0}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+              className="px-3 py-1.5 text-base font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
             >
               Read All
             </button>
 
             <button
               onClick={exportData}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition"
+              className="px-3 py-1.5 text-base font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition"
             >
               📥
             </button>
 
             <Link
               href="/dashboard"
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
+              className={`px-3 py-1.5 text-base font-medium rounded-lg transition ${
                 userBackground === 'dark'
                   ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1569,7 +1568,7 @@ export default function FeedbackPage() {
                 )
               }
               placeholder="Search..."
-              className={`flex-1 min-w-[140px] px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`flex-1 min-w-[140px] px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark'
                   ? 'bg-gray-700 text-white border-gray-600'
                   : 'bg-white border-gray-300'
@@ -1583,7 +1582,7 @@ export default function FeedbackPage() {
                   e.target.value as typeof filter
                 )
               }
-              className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark'
                   ? 'bg-gray-700 text-white border-gray-600'
                   : 'bg-white border-gray-300'
@@ -1617,7 +1616,7 @@ export default function FeedbackPage() {
                   e.target.value
                 )
               }
-              className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark'
                   ? 'bg-gray-700 text-white border-gray-600'
                   : 'bg-white border-gray-300'
@@ -1644,7 +1643,7 @@ export default function FeedbackPage() {
                   e.target.value as typeof sortBy
                 )
               }
-              className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              className={`px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 userBackground === 'dark'
                   ? 'bg-gray-700 text-white border-gray-600'
                   : 'bg-white border-gray-300'
@@ -1672,7 +1671,7 @@ export default function FeedbackPage() {
         {/* Results Count */}
         <div className="flex items-center justify-between">
           <p
-            className={`text-sm ${
+            className={`text-base ${
               userBackground === 'dark'
                 ? 'text-gray-400'
                 : 'text-gray-500'
@@ -1695,7 +1694,7 @@ export default function FeedbackPage() {
           >
             {/* Header */}
             <div
-              className={`grid grid-cols-12 gap-3 px-4 py-2.5 text-sm font-semibold rounded-lg ${
+              className={`grid grid-cols-12 gap-3 px-4 py-2.5 text-base font-semibold rounded-lg ${
                 userBackground === 'dark'
                   ? 'bg-gray-700 text-gray-300'
                   : 'bg-red-900 text-gray-200'
@@ -1749,7 +1748,7 @@ export default function FeedbackPage() {
                         feedback.id
                       ] = el;
                     }}
-                    className={`grid grid-cols-12 gap-3 px-4 py-3 text-sm cursor-pointer ${getRowClass()}`}
+                    className={`grid grid-cols-12 gap-3 px-4 py-3 text-base cursor-pointer ${getRowClass()}`}
                     onClick={() =>
                       toggleExpand(
                         feedback.id
@@ -1771,7 +1770,7 @@ export default function FeedbackPage() {
                   >
                     {/* Customer */}
                     <div className="col-span-3 truncate">
-                      <div className="font-medium truncate text-base">
+                      <div className="font-medium truncate text-lg">
                         {debouncedSearch ? (
                           <HighlightText
                             text={
@@ -1787,7 +1786,7 @@ export default function FeedbackPage() {
                       </div>
 
                       <div
-                        className={`text-sm truncate ${
+                        className={`text-base truncate ${
                           userBackground === 'dark'
                             ? 'text-gray-400'
                             : 'text-gray-500'
@@ -1812,7 +1811,7 @@ export default function FeedbackPage() {
                     </div>
 
                     {/* Comment */}
-                    <div className="col-span-3 truncate text-sm text-gray-600 dark:text-cyan-600">
+                    <div className="col-span-3 truncate text-base text-gray-600 dark:text-cyan-600">
                       "
                       {debouncedSearch ? (
                         <HighlightText
@@ -1841,7 +1840,7 @@ export default function FeedbackPage() {
                     </div>
 
                     {/* Driver */}
-                    <div className="col-span-2 truncate text-sm">
+                    <div className="col-span-2 truncate text-base">
                       {debouncedSearch &&
                       feedback.driverName ? (
                         <HighlightText
@@ -1869,7 +1868,7 @@ export default function FeedbackPage() {
                     </div>
 
                     {/* Date */}
-                    <div className="col-span-2 text-center truncate text-sm">
+                    <div className="col-span-2 text-center truncate text-base">
                       {formatDate(
                         feedback.createdAt
                       )}
@@ -1879,14 +1878,14 @@ export default function FeedbackPage() {
                     <div className="col-span-1 flex justify-center items-center gap-1.5">
                       {!feedback.isRead && (
                         <span
-                          className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"
+                          className="w-3 h-3 bg-red-500 rounded-full animate-pulse"
                           aria-label="Unread"
                         />
                       )}
 
                       {feedback.reply && (
                         <span
-                          className="text-sm text-green-500"
+                          className="text-base text-green-500"
                           aria-label="Has reply"
                         >
                           ↩
@@ -1908,7 +1907,7 @@ export default function FeedbackPage() {
                       {/* Comment */}
                       <div>
                         <div
-                          className={`text-sm font-medium ${
+                          className={`text-base font-medium ${
                             userBackground ===
                             'dark'
                               ? 'text-gray-300'
@@ -1919,7 +1918,7 @@ export default function FeedbackPage() {
                         </div>
 
                         <div
-                          className={`p-3 rounded text-sm ${
+                          className={`p-3 rounded text-base ${
                             userBackground ===
                             'dark'
                               ? 'bg-gray-700/50 text-gray-300'
@@ -1954,7 +1953,7 @@ export default function FeedbackPage() {
                           }`}
                         >
                           <div
-                            className={`text-sm font-medium mb-2 ${
+                            className={`text-base font-medium mb-2 ${
                               userBackground ===
                               'dark'
                                 ? 'text-blue-300'
@@ -1964,7 +1963,7 @@ export default function FeedbackPage() {
                             📦 Last Delivery Details
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-base">
                             <div>
                               <span
                                 className={
@@ -2092,7 +2091,7 @@ export default function FeedbackPage() {
                                 </span>
 
                                 <span
-                                  className={`ml-1 px-2 py-0.5 rounded text-xs font-medium ${
+                                  className={`ml-1 px-2 py-0.5 rounded text-sm font-medium ${
                                     feedback
                                       .orderDetails
                                       .status ===
@@ -2149,7 +2148,7 @@ export default function FeedbackPage() {
                       )}
 
                       {/* Details Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-base">
                         <div>
                           <div
                             className={
@@ -2162,19 +2161,19 @@ export default function FeedbackPage() {
                             Customer
                           </div>
 
-                          <div className="font-medium text-base">
+                          <div className="font-medium text-lg">
                             {
                               feedback.customerName
                             }
                           </div>
 
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-base text-gray-500 dark:text-gray-400">
                             {
                               feedback.customerEmail
                             }
                           </div>
 
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-base text-gray-500 dark:text-gray-400">
                             {
                               feedback.customerPhone
                             }
@@ -2193,14 +2192,14 @@ export default function FeedbackPage() {
                             Driver
                           </div>
 
-                          <div className="font-medium text-base">
+                          <div className="font-medium text-lg">
                             {
                               feedback.driverName ||
                               'N/A'
                             }
                           </div>
 
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-base text-gray-500 dark:text-gray-400">
                             {
                               feedback.driverPhone ||
                               ''
@@ -2231,14 +2230,14 @@ export default function FeedbackPage() {
                             />
                           </div>
 
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-base text-gray-500 dark:text-gray-400">
                             {formatDate(
                               feedback.createdAt
                             )}
                           </div>
 
                           {feedback.orderId && (
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div className="text-base text-gray-500 dark:text-gray-400">
                               Order: #
                               {feedback.orderId.slice(
                                 0,
@@ -2271,7 +2270,7 @@ export default function FeedbackPage() {
                                     feedback.id
                                   );
                                 }}
-                                className="px-2 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                                className="px-2 py-1 text-base bg-blue-500 text-white rounded hover:bg-blue-600 transition"
                               >
                                 Read
                               </button>
@@ -2297,7 +2296,7 @@ export default function FeedbackPage() {
                                   );
                                 }
                               }}
-                              className="px-2 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition"
+                              className="px-2 py-1 text-base bg-green-500 text-white rounded hover:bg-green-600 transition"
                             >
                               Reply
                             </button>
@@ -2321,7 +2320,7 @@ export default function FeedbackPage() {
                               )
                             }
                             placeholder="Write reply to client..."
-                            className={`flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                            className={`flex-1 px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                               userBackground ===
                               'dark'
                                 ? 'bg-gray-700 text-white border-gray-600'
@@ -2358,7 +2357,7 @@ export default function FeedbackPage() {
                               isReplying ||
                               !replyText.trim()
                             }
-                            className="px-3 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
+                            className="px-3 py-2 text-base font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
                           >
                             {isReplying
                               ? 'Sending...'
@@ -2374,7 +2373,7 @@ export default function FeedbackPage() {
                               setReplyText('');
                             }}
                             disabled={isReplying}
-                            className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                            className="px-3 py-2 text-base font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
                           >
                             Cancel
                           </button>
@@ -2384,7 +2383,7 @@ export default function FeedbackPage() {
                       {/* Existing Reply */}
                       {feedback.reply && (
                         <div
-                          className={`p-3 rounded text-sm ${
+                          className={`p-3 rounded text-base ${
                             userBackground ===
                             'dark'
                               ? 'bg-green-900/30 text-green-300'
@@ -2397,7 +2396,7 @@ export default function FeedbackPage() {
                           {feedback.reply}
 
                           {feedback.replyAt && (
-                            <div className="text-xs mt-1 opacity-70">
+                            <div className="text-sm mt-1 opacity-70">
                               {formatDate(
                                 feedback.replyAt
                               )}
@@ -2420,7 +2419,7 @@ export default function FeedbackPage() {
             </div>
 
             <h3
-              className={`text-xl font-semibold ${
+              className={`text-2xl font-semibold ${
                 userBackground === 'dark'
                   ? 'text-white'
                   : 'text-gray-900'
@@ -2430,7 +2429,7 @@ export default function FeedbackPage() {
             </h3>
 
             <p
-              className={`text-sm mt-1.5 ${
+              className={`text-base mt-1.5 ${
                 userBackground === 'dark'
                   ? 'text-gray-400'
                   : 'text-gray-500'

@@ -1939,7 +1939,7 @@ export default function FuelTanks() {
           colorMap[fuelType] || 
           'from-blue-500 to-blue-300'; 
  
-
+ 
         // Live tank-level identification colors. Only the tank visualization
         // uses these colors; all existing fuel/accounting logic remains intact.
         const tankLevelColor =
@@ -2011,11 +2011,11 @@ export default function FuelTanks() {
               <div className="flex items-center justify-between mb-3"> 
                 <div className="flex items-center space-x-3"> 
                   <div 
-                    className={`w-4 h-4 rounded-full ${status.color}`} 
+                    className={`w-5 h-5 rounded-full ${status.color}`} 
                   ></div> 
  
                   <h3 
-                    className={`text-lg font-bold ${ 
+                    className={`text-xl font-bold ${ 
                       userBackground === 
                       'dark' 
                         ? 'text-white' 
@@ -2026,7 +2026,7 @@ export default function FuelTanks() {
                   </h3> 
  
                   <span 
-                    className={`text-sm font-medium ${status.color}`} 
+                    className={`text-base font-medium ${status.color}`} 
                   > 
                     {status.icon}{' '} 
                     {status.label} 
@@ -2035,7 +2035,7 @@ export default function FuelTanks() {
  
                 <div className="text-right"> 
                   <span 
-                    className={`text-2xl font-bold ${ 
+                    className={`text-3xl font-bold ${ 
                       isFull 
                         ? 'text-red-600' 
                         : userBackground === 
@@ -2051,7 +2051,7 @@ export default function FuelTanks() {
                   </span> 
  
                   <span 
-                    className={`text-sm ml-1 ${ 
+                    className={`text-base ml-1 ${ 
                       userBackground === 
                       'dark' 
                         ? 'text-gray-400' 
@@ -2065,14 +2065,14 @@ export default function FuelTanks() {
  
  
               {isFull && ( 
-                <div className="mb-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-1 font-bold animate-pulse text-center"> 
+                <div className="mb-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-1 font-bold animate-pulse text-center"> 
                   TANK IS FULL! 
                 </div> 
               )} 
  
  
               {deliveredToday > 0 && ( 
-                <div className="mb-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-1"> 
+                <div className="mb-2 text-sm text-blue-600 bg-blue-50 rounded-lg px-3 py-1"> 
                   {deliveredToday.toFixed( 
                     1 
                   )} 
@@ -2092,7 +2092,7 @@ export default function FuelTanks() {
                       : 'bg-blue-50 border-blue-100' 
                   }`} 
                 > 
-                  <div className="grid grid-cols-2 gap-2 text-xs"> 
+                  <div className="grid grid-cols-2 gap-2 text-sm"> 
                     <div> 
                       <p 
                         className={ 
@@ -2106,7 +2106,7 @@ export default function FuelTanks() {
                       </p> 
  
                       <p 
-                        className={`font-bold ${ 
+                        className={`font-bold text-base ${ 
                           userBackground === 
                           'dark' 
                             ? 'text-white' 
@@ -2135,7 +2135,7 @@ export default function FuelTanks() {
                         Avg. Import Price 
                       </p> 
  
-                      <p className="font-bold text-blue-600"> 
+                      <p className="font-bold text-blue-600 text-base"> 
                         {fuelImport.averagePricePerLiter > 
                         0 
                           ? `KSh ${fuelImport.averagePricePerLiter.toFixed( 
@@ -2235,13 +2235,13 @@ export default function FuelTanks() {
                         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 px-3 py-1 shadow-md"
                         style={{ backgroundColor: tankLevelColor }}
                       >
-                        <span className="text-[10px] font-extrabold tracking-wide text-white">
+                        <span className="text-xs font-extrabold tracking-wide text-white">
                           {tankLevelLabel}
                         </span>
                       </div>
 
                       {/* Transparent measurement line beside the tank */}
-                      <div className="absolute -right-8 top-2 bottom-2 flex w-16 flex-col items-center justify-between text-[10px] font-semibold text-gray-500">
+                      <div className="absolute -right-8 top-2 bottom-2 flex w-16 flex-col items-center justify-between text-xs font-semibold text-gray-500">
                         <span>100%</span>
                         <span>75%</span>
                         <span>50%</span>
@@ -2257,7 +2257,7 @@ export default function FuelTanks() {
                         }}
                       >
                         <span
-                          className="absolute -right-16 -top-3 whitespace-nowrap rounded px-2 py-1 text-[10px] font-bold text-white shadow-sm"
+                          className="absolute -right-16 -top-3 whitespace-nowrap rounded px-2 py-1 text-xs font-bold text-white shadow-sm"
                           style={{ backgroundColor: tankLevelDarkColor }}
                         >
                           {amount.toLocaleString(undefined, { maximumFractionDigits: 1 })}L
@@ -2268,7 +2268,7 @@ export default function FuelTanks() {
 
                   {/* Current amount shown clearly over the tank */}
                   <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full px-4 py-1.5 backdrop-blur-sm shadow-sm" style={{ backgroundColor: tankLevelDarkColor }}>
-                    <span className="text-sm font-bold text-white">
+                    <span className="text-base font-bold text-white">
                       {percentage.toFixed(1)}% · {amount.toLocaleString(undefined, { maximumFractionDigits: 1 })}L · {tankLevelLabel}
                     </span>
                   </div>
@@ -2287,7 +2287,7 @@ export default function FuelTanks() {
                   }`} 
                 > 
                   <p 
-                    className={`text-xs ${ 
+                    className={`text-sm ${ 
                       userBackground === 
                       'dark' 
                         ? 'text-gray-400' 
@@ -2298,7 +2298,7 @@ export default function FuelTanks() {
                   </p> 
  
                   <p 
-                    className={`font-bold ${ 
+                    className={`font-bold text-base ${ 
                       isFull 
                         ? 'text-red-600' 
                         : userBackground === 
@@ -2323,7 +2323,7 @@ export default function FuelTanks() {
                   }`} 
                 > 
                   <p 
-                    className={`text-xs ${ 
+                    className={`text-sm ${ 
                       userBackground === 
                       'dark' 
                         ? 'text-gray-400' 
@@ -2334,7 +2334,7 @@ export default function FuelTanks() {
                   </p> 
  
                   <p 
-                    className={`font-bold ${ 
+                    className={`font-bold text-base ${ 
                       userBackground === 
                       'dark' 
                         ? 'text-white' 
@@ -2360,7 +2360,7 @@ export default function FuelTanks() {
                     }`} 
                   > 
                     <p 
-                      className={`text-xs ${ 
+                      className={`text-sm ${ 
                         userBackground === 
                         'dark' 
                           ? 'text-gray-400' 
@@ -2371,7 +2371,7 @@ export default function FuelTanks() {
                     </p> 
  
                     <p 
-                      className={`font-bold ${ 
+                      className={`font-bold text-base ${ 
                         userBackground === 
                         'dark' 
                           ? 'text-white' 
@@ -2399,7 +2399,7 @@ export default function FuelTanks() {
                     }`} 
                   > 
                     <p 
-                      className={`text-xs ${ 
+                      className={`text-sm ${ 
                         userBackground === 
                         'dark' 
                           ? 'text-gray-400' 
@@ -2409,7 +2409,7 @@ export default function FuelTanks() {
                       Latest Price/L 
                     </p> 
  
-                    <p className="font-bold text-blue-600"> 
+                    <p className="font-bold text-blue-600 text-base"> 
                       {fuelImport.latestPricePerLiter > 
                       0 
                         ? `KSh ${fuelImport.latestPricePerLiter.toFixed( 
@@ -2425,7 +2425,7 @@ export default function FuelTanks() {
               {/* Info Message */} 
               <div className="mt-3 text-center"> 
                 <p 
-                  className={`text-xs ${ 
+                  className={`text-sm ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -2561,17 +2561,17 @@ export default function FuelTanks() {
     <div 
       className={`min-h-screen p-4 md:p-6 transition-colors duration-300 ${getBackgroundClass()}`} 
     > 
-      <div className="max-w-7xl mx-auto space-y-6"> 
+      <div className="w-full max-w-full mx-auto space-y-6"> 
  
         {/* Header */} 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"> 
+        <div className="flex flex-wrap items-center justify-between gap-4"> 
           <div> 
-            <h1 className="text-2xl font-bold"> 
+            <h1 className="text-3xl font-bold"> 
               Fuel Tanks 
             </h1> 
  
             <p 
-              className={`text-sm mt-1 ${ 
+              className={`text-base mt-1 ${ 
                 userBackground === 
                 'dark' 
                   ? 'text-gray-400' 
@@ -2584,7 +2584,7 @@ export default function FuelTanks() {
  
           <Link 
             href="/fuel" 
-            className={`text-sm ${ 
+            className={`text-base ${ 
               userBackground === 
               'dark' 
                 ? 'text-gray-400 hover:text-gray-200' 
@@ -2640,25 +2640,25 @@ export default function FuelTanks() {
                   } ${ 
                     fuelType === 
                     'Diesel' 
-                      ? 'bg-green-500' 
+                      ? 'bg-cyan-500' 
                       : fuelType === 
                         'Kerosene' 
-                        ? 'bg-blue-500' 
+                        ? 'bg-blue-300' 
                         : fuelType === 
                           'Petrol' 
-                          ? 'bg-red-500' 
+                          ? 'bg-red-300' 
                           : fuelType === 
                             'V-Power' 
                             ? 'bg-purple-500' 
                             : 'bg-white' 
                   }`} 
                 > 
-                  <p className="text-sm text-gray-600"> 
+                  <p className="text-base text-gray-600"> 
                     {fuelType} 
                   </p> 
  
                   <p 
-                    className={`text-xl font-bold ${ 
+                    className={`text-2xl font-bold ${ 
                       isFull 
                         ? 'text-red-600' 
                         : 'text-gray-900' 
@@ -2673,9 +2673,9 @@ export default function FuelTanks() {
                   </p> 
  
                   <div className="flex items-center mt-1"> 
-                    <div className="w-full bg-gray-200 rounded-full h-2"> 
+                    <div className="w-full bg-gray-200 rounded-full h-2.5"> 
                       <div 
-                        className={`h-2 rounded-full ${ 
+                        className={`h-2.5 rounded-full ${ 
                           isFull 
                             ? 'bg-red-500' 
                             : percentage > 
@@ -2698,7 +2698,7 @@ export default function FuelTanks() {
                       /> 
                     </div> 
  
-                    <span className="text-xs ml-2 text-gray-500"> 
+                    <span className="text-sm ml-2 text-gray-500"> 
                       {percentage.toFixed( 
                         0 
                       )} 
@@ -2707,14 +2707,14 @@ export default function FuelTanks() {
                   </div> 
  
                   {isFull && ( 
-                    <p className="text-xs text-red-600 mt-1 font-bold animate-pulse"> 
+                    <p className="text-sm text-red-600 mt-1 font-bold animate-pulse"> 
                       FULL 
                     </p> 
                   )} 
  
                   {deliveredToday > 
                     0 && ( 
-                    <p className="text-xs text-blue-600 mt-1"> 
+                    <p className="text-sm text-blue-600 mt-1"> 
                       {deliveredToday.toFixed( 
                         1 
                       )} 
@@ -2743,7 +2743,7 @@ export default function FuelTanks() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4"> 
             <div> 
               <h2 
-                className={`text-lg font-semibold ${ 
+                className={`text-xl font-semibold ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-white' 
@@ -2754,7 +2754,7 @@ export default function FuelTanks() {
               </h2> 
  
               <p 
-                className={`text-xs mt-1 ${ 
+                className={`text-sm mt-1 ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-400' 
@@ -2771,11 +2771,11 @@ export default function FuelTanks() {
                   userBackground === 
                   'dark' 
                     ? 'bg-gray-700' 
-                    : 'bg-blue-50' 
+                    : 'bg-blue-200' 
                 }`} 
               > 
                 <p 
-                  className={`text-xs ${ 
+                  className={`text-sm ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -2785,7 +2785,7 @@ export default function FuelTanks() {
                   Total Imported 
                 </p> 
  
-                <p className="font-bold text-blue-600"> 
+                <p className="font-bold text-blue-600 text-lg"> 
                   {totalImportedLitres.toLocaleString( 
                     undefined, 
                     { 
@@ -2801,11 +2801,11 @@ export default function FuelTanks() {
                   userBackground === 
                   'dark' 
                     ? 'bg-gray-700' 
-                    : 'bg-green-50' 
+                    : 'bg-green-200' 
                 }`} 
               > 
                 <p 
-                  className={`text-xs ${ 
+                  className={`text-sm ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -2815,7 +2815,7 @@ export default function FuelTanks() {
                   Total Import Cost 
                 </p> 
  
-                <p className="font-bold text-green-600"> 
+                <p className="font-bold text-green-600 text-lg"> 
                   {totalImportCost > 
                   0 
                     ? `KSh ${totalImportCost.toLocaleString( 
@@ -2848,13 +2848,13 @@ export default function FuelTanks() {
                   string 
                 > = { 
                   Petrol: 
-                    'border-red-200 bg-red-50', 
+                    'border-red-200 bg-orange-200', 
                   Diesel: 
-                    'border-green-200 bg-green-50', 
+                    'border-green-200 bg-yellow-200', 
                   Kerosene: 
-                    'border-blue-200 bg-blue-50', 
+                    'border-blue-200 bg-olive-200', 
                   'V-Power': 
-                    'border-purple-200 bg-purple-50' 
+                    'border-purple-200 bg-teal-200' 
                 }; 
  
                 return ( 
@@ -2871,7 +2871,7 @@ export default function FuelTanks() {
                   > 
                     <div className="flex items-center justify-between mb-3"> 
                       <h3 
-                        className={`font-bold ${ 
+                        className={`font-bold text-lg ${ 
                           userBackground === 
                           'dark' 
                             ? 'text-white' 
@@ -2881,7 +2881,7 @@ export default function FuelTanks() {
                         {fuelType} 
                       </h3> 
  
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700"> 
+                      <span className="text-sm px-2 py-1 rounded-full bg-blue-100 text-blue-700"> 
                         IMPORT 
                       </span> 
                     </div> 
@@ -2900,7 +2900,7 @@ export default function FuelTanks() {
                         </span> 
  
                         <span 
-                          className={`font-bold ${ 
+                          className={`font-bold text-base ${ 
                             userBackground === 
                             'dark' 
                               ? 'text-white' 
@@ -2929,7 +2929,7 @@ export default function FuelTanks() {
                           Average price/L 
                         </span> 
  
-                        <span className="font-bold text-blue-600"> 
+                        <span className="font-bold text-blue-600 text-base"> 
                           {item.averagePricePerLiter > 
                           0 
                             ? `KSh ${item.averagePricePerLiter.toFixed( 
@@ -2951,7 +2951,7 @@ export default function FuelTanks() {
                           Latest price/L 
                         </span> 
  
-                        <span className="font-bold text-purple-600"> 
+                        <span className="font-bold text-purple-600 text-base"> 
                           {item.latestPricePerLiter > 
                           0 
                             ? `KSh ${item.latestPricePerLiter.toFixed( 
@@ -2973,7 +2973,7 @@ export default function FuelTanks() {
                           Total cost 
                         </span> 
  
-                        <span className="font-bold text-green-600"> 
+                        <span className="font-bold text-green-600 text-base"> 
                           {item.totalCost > 
                           0 
                             ? `KSh ${item.totalCost.toLocaleString( 
@@ -2993,7 +2993,7 @@ export default function FuelTanks() {
           </div> 
  
           <div 
-            className={`mt-4 rounded-lg p-3 text-xs ${ 
+            className={`mt-4 rounded-lg p-3 text-sm ${ 
               userBackground === 
               'dark' 
                 ? 'bg-gray-700/50 text-gray-400' 
@@ -3023,7 +3023,7 @@ export default function FuelTanks() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4"> 
             <div> 
               <h2 
-                className={`text-lg font-semibold ${ 
+                className={`text-xl font-semibold ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-white' 
@@ -3034,7 +3034,7 @@ export default function FuelTanks() {
               </h2> 
  
               <p 
-                className={`text-xs mt-1 ${ 
+                className={`text-sm mt-1 ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-400' 
@@ -3051,11 +3051,11 @@ export default function FuelTanks() {
                   userBackground === 
                   'dark' 
                     ? 'bg-gray-700' 
-                    : 'bg-orange-50' 
+                    : 'bg-orange-200' 
                 }`} 
               > 
                 <p 
-                  className={`text-xs ${ 
+                  className={`text-sm ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -3065,7 +3065,7 @@ export default function FuelTanks() {
                   Total Given 
                 </p> 
  
-                <p className="font-bold text-orange-600"> 
+                <p className="font-bold text-orange-600 text-lg"> 
                   {totalDriverFuelGiven.toLocaleString( 
                     undefined, 
                     { 
@@ -3081,11 +3081,11 @@ export default function FuelTanks() {
                   userBackground === 
                   'dark' 
                     ? 'bg-gray-700' 
-                    : 'bg-purple-50' 
+                    : 'bg-purple-200' 
                 }`} 
               > 
                 <p 
-                  className={`text-xs ${ 
+                  className={`text-sm ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -3095,7 +3095,7 @@ export default function FuelTanks() {
                   Drivers Served 
                 </p> 
  
-                <p className="font-bold text-purple-600"> 
+                <p className="font-bold text-purple-600 text-lg"> 
                   {totalDriversServed} 
                 </p> 
               </div> 
@@ -3120,13 +3120,13 @@ export default function FuelTanks() {
                   string 
                 > = { 
                   Petrol: 
-                    'border-red-200 bg-red-50', 
+                    'border-red-200 bg-teal-300', 
                   Diesel: 
-                    'border-green-200 bg-green-50', 
+                    'border-green-200 bg-yellow-300', 
                   Kerosene: 
-                    'border-blue-200 bg-blue-50', 
+                    'border-blue-200 bg-orange-300', 
                   'V-Power': 
-                    'border-purple-200 bg-purple-50' 
+                    'border-purple-200 bg-olive-300' 
                 }; 
  
                 return ( 
@@ -3143,7 +3143,7 @@ export default function FuelTanks() {
                   > 
                     <div className="flex items-center justify-between mb-3"> 
                       <h3 
-                        className={`font-bold ${ 
+                        className={`font-bold text-lg ${ 
                           userBackground === 
                           'dark' 
                             ? 'text-white' 
@@ -3153,7 +3153,7 @@ export default function FuelTanks() {
                         {fuelType} 
                       </h3> 
  
-                      <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700"> 
+                      <span className="text-sm px-2 py-1 rounded-full bg-orange-100 text-orange-700"> 
                         DRIVERS 
                       </span> 
                     </div> 
@@ -3172,7 +3172,7 @@ export default function FuelTanks() {
                         </span> 
  
                         <span 
-                          className={`font-bold ${ 
+                          className={`font-bold text-base ${ 
                             userBackground === 
                             'dark' 
                               ? 'text-white' 
@@ -3202,7 +3202,7 @@ export default function FuelTanks() {
                         </span> 
  
                         <span 
-                          className={`font-bold ${ 
+                          className={`font-bold text-base ${ 
                             userBackground === 
                             'dark' 
                               ? 'text-white' 
@@ -3226,7 +3226,7 @@ export default function FuelTanks() {
                         </span> 
  
                         <span 
-                          className={`font-bold ${ 
+                          className={`font-bold text-base ${ 
                             userBackground === 
                             'dark' 
                               ? 'text-white' 
@@ -3244,7 +3244,7 @@ export default function FuelTanks() {
           </div> 
  
           <div 
-            className={`mt-4 rounded-lg p-3 text-xs ${ 
+            className={`mt-4 rounded-lg p-3 text-sm ${ 
               userBackground === 
               'dark' 
                 ? 'bg-gray-700/50 text-gray-400' 
@@ -3290,7 +3290,7 @@ export default function FuelTanks() {
           > 
             <div className="flex items-center justify-between mb-4"> 
               <h2 
-                className={`text-lg font-semibold ${ 
+                className={`text-xl font-semibold ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-white' 
@@ -3299,7 +3299,7 @@ export default function FuelTanks() {
               > 
                 📦 Import Activity Log 
                 <span 
-                  className={`text-sm font-normal ml-2 ${ 
+                  className={`text-base font-normal ml-2 ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -3317,7 +3317,7 @@ export default function FuelTanks() {
                       !showAllImports 
                     ) 
                   } 
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium transition" 
+                  className="text-base text-blue-600 hover:text-blue-800 font-medium transition" 
                 > 
                   {showAllImports 
                     ? 'Show Less' 
@@ -3356,7 +3356,7 @@ export default function FuelTanks() {
                       return ( 
                         <div 
                           key={`import-log-${index}`} 
-                          className={`p-3 rounded-lg text-sm ${ 
+                          className={`p-3 rounded-lg text-base ${ 
                             userBackground === 
                             'dark' 
                               ? 'bg-gray-800/50' 
@@ -3366,13 +3366,13 @@ export default function FuelTanks() {
                           <div className="flex items-center justify-between gap-3"> 
                             <div className="flex items-center space-x-3 min-w-0"> 
                               <span 
-                                className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-green-100 text-green-700`} 
+                                className={`px-2 py-1 rounded-full text-sm font-medium whitespace-nowrap bg-green-100 text-green-700`} 
                               > 
                                 Imported 
                               </span> 
  
                               <span 
-                                className={`min-w-0 ${ 
+                                className={`min-w-0 text-base ${ 
                                   userBackground === 
                                   'dark' 
                                     ? 'text-gray-300' 
@@ -3389,7 +3389,7 @@ export default function FuelTanks() {
                             </div> 
  
                             <span 
-                              className={`text-xs whitespace-nowrap ${ 
+                              className={`text-sm whitespace-nowrap ${ 
                                 userBackground === 
                                 'dark' 
                                   ? 'text-gray-400' 
@@ -3402,7 +3402,7 @@ export default function FuelTanks() {
  
                           {/* IMPORT PRICE DETAILS */} 
                           <div className="mt-2 ml-0 flex flex-wrap gap-2"> 
-                            <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-1"> 
+                            <span className="text-sm bg-blue-100 text-blue-700 rounded px-2 py-1"> 
                               Imported:{' '} 
                               {Number( 
                                 entry.amount || 
@@ -3411,7 +3411,7 @@ export default function FuelTanks() {
                               L 
                             </span> 
  
-                            <span className="text-xs bg-purple-100 text-purple-700 rounded px-2 py-1"> 
+                            <span className="text-sm bg-purple-100 text-purple-700 rounded px-2 py-1"> 
                               Price/L:{' '} 
                               {importPrice > 
                               0 
@@ -3421,7 +3421,7 @@ export default function FuelTanks() {
                                 : 'Not recorded'} 
                             </span> 
  
-                            <span className="text-xs bg-green-100 text-green-700 rounded px-2 py-1"> 
+                            <span className="text-sm bg-green-100 text-green-700 rounded px-2 py-1"> 
                               Total:{' '} 
                               {importCost > 
                               0 
@@ -3435,7 +3435,7 @@ export default function FuelTanks() {
                             </span> 
  
                             {entry.importReference && ( 
-                              <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                 Ref:{' '} 
                                 { 
                                   entry.importReference 
@@ -3448,7 +3448,7 @@ export default function FuelTanks() {
                             {entry.previousTankAmount !== 
                               undefined && ( 
                               <span 
-                                className={`text-xs ${ 
+                                className={`text-sm ${ 
                                   userBackground === 
                                   'dark' 
                                     ? 'text-gray-400' 
@@ -3468,7 +3468,7 @@ export default function FuelTanks() {
                             )} 
  
                             {entry.capacityInfo && ( 
-                              <span className="text-xs text-purple-600 font-medium"> 
+                              <span className="text-sm text-purple-600 font-medium"> 
                                 {entry.capacityInfo} 
                               </span> 
                             )} 
@@ -3511,7 +3511,7 @@ export default function FuelTanks() {
           > 
             <div className="flex items-center justify-between mb-4"> 
               <h2 
-                className={`text-lg font-semibold ${ 
+                className={`text-xl font-semibold ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-white' 
@@ -3520,7 +3520,7 @@ export default function FuelTanks() {
               > 
                 🚛 Driver Fuel Activity 
                 <span 
-                  className={`text-sm font-normal ml-2 ${ 
+                  className={`text-base font-normal ml-2 ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -3538,7 +3538,7 @@ export default function FuelTanks() {
                       !showAllDriverFuel 
                     ) 
                   } 
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium transition" 
+                  className="text-base text-blue-600 hover:text-blue-800 font-medium transition" 
                 > 
                   {showAllDriverFuel 
                     ? 'Show Less' 
@@ -3559,7 +3559,7 @@ export default function FuelTanks() {
                       return ( 
                         <div 
                           key={`driver-log-${index}`} 
-                          className={`p-3 rounded-lg text-sm ${ 
+                          className={`p-3 rounded-lg text-base ${ 
                             userBackground === 
                             'dark' 
                               ? 'bg-gray-800/50' 
@@ -3569,13 +3569,13 @@ export default function FuelTanks() {
                           <div className="flex items-center justify-between gap-3"> 
                             <div className="flex items-center space-x-3 min-w-0"> 
                               <span 
-                                className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-orange-100 text-orange-700`} 
+                                className={`px-2 py-1 rounded-full text-sm font-medium whitespace-nowrap bg-orange-100 text-orange-700`} 
                               > 
                                 Given to Driver 
                               </span> 
  
                               <span 
-                                className={`min-w-0 ${ 
+                                className={`min-w-0 text-base ${ 
                                   userBackground === 
                                   'dark' 
                                     ? 'text-gray-300' 
@@ -3595,7 +3595,7 @@ export default function FuelTanks() {
                             </div> 
  
                             <span 
-                              className={`text-xs whitespace-nowrap ${ 
+                              className={`text-sm whitespace-nowrap ${ 
                                 userBackground === 
                                 'dark' 
                                   ? 'text-gray-400' 
@@ -3608,31 +3608,31 @@ export default function FuelTanks() {
  
                           <div className="mt-2 flex flex-wrap gap-2"> 
                             {entry.driverId && ( 
-                              <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                 Driver ID: {entry.driverId.substring(0, 12)}... 
                               </span> 
                             )} 
  
                             {entry.deliveryId && ( 
-                              <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                 Delivery: {entry.deliveryId} 
                               </span> 
                             )} 
  
                             {entry.saleId && ( 
-                              <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                 Sale: {entry.saleId} 
                               </span> 
                             )} 
  
                             {entry.customerName && ( 
-                              <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                 Customer: {entry.customerName} 
                               </span> 
                             )} 
  
                             {entry.truckNumber && ( 
-                              <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                 Truck: {entry.truckNumber} 
                               </span> 
                             )} 
@@ -3640,7 +3640,7 @@ export default function FuelTanks() {
                             {entry.previousTankAmount !== 
                               undefined && ( 
                               <span 
-                                className={`text-xs ${ 
+                                className={`text-sm ${ 
                                   userBackground === 
                                   'dark' 
                                     ? 'text-gray-400' 
@@ -3660,7 +3660,7 @@ export default function FuelTanks() {
                             )} 
  
                             {entry.capacityInfo && ( 
-                              <span className="text-xs text-purple-600 font-medium"> 
+                              <span className="text-sm text-purple-600 font-medium"> 
                                 {entry.capacityInfo} 
                               </span> 
                             )} 
@@ -3703,7 +3703,7 @@ export default function FuelTanks() {
           > 
             <div className="flex items-center justify-between mb-4"> 
               <h2 
-                className={`text-lg font-semibold ${ 
+                className={`text-xl font-semibold ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-white' 
@@ -3712,7 +3712,7 @@ export default function FuelTanks() {
               > 
                 Full Activity Log 
                 <span 
-                  className={`text-sm font-normal ml-2 ${ 
+                  className={`text-base font-normal ml-2 ${ 
                     userBackground === 
                     'dark' 
                       ? 'text-gray-400' 
@@ -3732,7 +3732,7 @@ export default function FuelTanks() {
                       !showAllActivities 
                     ) 
                   } 
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium transition" 
+                  className="text-base text-blue-600 hover:text-blue-800 font-medium transition" 
                 > 
                   {showAllActivities 
                     ? 'Show Less' 
@@ -3754,7 +3754,7 @@ export default function FuelTanks() {
                 <div className="flex flex-wrap items-end gap-3"> 
                   <div> 
                     <label 
-                      className={`block text-xs font-medium ${ 
+                      className={`block text-sm font-medium ${ 
                         userBackground === 
                         'dark' 
                           ? 'text-gray-400' 
@@ -3775,7 +3775,7 @@ export default function FuelTanks() {
                             .value 
                         ) 
                       } 
-                      className={`px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${ 
+                      className={`px-3 py-1.5 border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${ 
                         userBackground === 
                         'dark' 
                           ? 'bg-gray-700 text-white border-gray-600' 
@@ -3786,7 +3786,7 @@ export default function FuelTanks() {
  
                   <div> 
                     <label 
-                      className={`block text-xs font-medium ${ 
+                      className={`block text-sm font-medium ${ 
                         userBackground === 
                         'dark' 
                           ? 'text-gray-500' 
@@ -3807,7 +3807,7 @@ export default function FuelTanks() {
                             .value 
                         ) 
                       } 
-                      className={`px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${ 
+                      className={`px-3 py-1.5 border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${ 
                         userBackground === 
                         'dark' 
                           ? 'bg-gray-700 text-white border-gray-600' 
@@ -3825,7 +3825,7 @@ export default function FuelTanks() {
                       (!dateFrom && 
                         !dateTo) 
                     } 
-                    className={`px-4 py-1.5 text-sm font-medium text-white rounded-lg transition ${ 
+                    className={`px-4 py-1.5 text-base font-medium text-white rounded-lg transition ${ 
                       isFiltering || 
                       (!dateFrom && 
                         !dateTo) 
@@ -3844,7 +3844,7 @@ export default function FuelTanks() {
                       onClick={ 
                         resetDateFilter 
                       } 
-                      className={`px-4 py-1.5 text-sm font-medium rounded-lg transition ${ 
+                      className={`px-4 py-1.5 text-base font-medium rounded-lg transition ${ 
                         userBackground === 
                         'dark' 
                           ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' 
@@ -3886,12 +3886,12 @@ export default function FuelTanks() {
                             ) 
                           : 0; 
  
-                      const isDriverFuel = isDriverFuelEntry(entry) || entry.action === 'remove';
+                      const isDriverFuel = isDriverFuelEntry(entry) || entry.action === 'remove'; 
  
                       return ( 
                         <div 
                           key={`log-${index}`} 
-                          className={`p-3 rounded-lg text-sm ${ 
+                          className={`p-3 rounded-lg text-base ${ 
                             userBackground === 
                             'dark' 
                               ? 'bg-gray-800/50' 
@@ -3903,7 +3903,7 @@ export default function FuelTanks() {
                           <div className="flex items-center justify-between gap-3"> 
                             <div className="flex items-center space-x-3 min-w-0"> 
                               <span 
-                                className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${ 
+                                className={`px-2 py-1 rounded-full text-sm font-medium whitespace-nowrap ${ 
                                   isDriverFuel 
                                     ? 'bg-orange-100 text-orange-700' 
                                     : 'bg-green-100 text-green-700' 
@@ -3913,7 +3913,7 @@ export default function FuelTanks() {
                               </span> 
  
                               <span 
-                                className={`min-w-0 ${ 
+                                className={`min-w-0 text-base ${ 
                                   userBackground === 
                                   'dark' 
                                     ? 'text-gray-300' 
@@ -3937,7 +3937,7 @@ export default function FuelTanks() {
                             </div> 
  
                             <span 
-                              className={`text-xs whitespace-nowrap ${ 
+                              className={`text-sm whitespace-nowrap ${ 
                                 userBackground === 
                                 'dark' 
                                   ? 'text-gray-400' 
@@ -3952,7 +3952,7 @@ export default function FuelTanks() {
                           {/* IMPORT PRICE DETAILS - Only for imports */} 
                           {!isDriverFuel && isFuelImportEntry(entry) && ( 
                             <div className="mt-2 ml-0 flex flex-wrap gap-2"> 
-                              <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-blue-100 text-blue-700 rounded px-2 py-1"> 
                                 Imported:{' '} 
                                 {Number( 
                                   entry.amount || 
@@ -3961,7 +3961,7 @@ export default function FuelTanks() {
                                 L 
                               </span> 
  
-                              <span className="text-xs bg-purple-100 text-purple-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-purple-100 text-purple-700 rounded px-2 py-1"> 
                                 Price/L:{' '} 
                                 {importPrice > 
                                 0 
@@ -3971,7 +3971,7 @@ export default function FuelTanks() {
                                   : 'Not recorded'} 
                               </span> 
  
-                              <span className="text-xs bg-green-100 text-green-700 rounded px-2 py-1"> 
+                              <span className="text-sm bg-green-100 text-green-700 rounded px-2 py-1"> 
                                 Total:{' '} 
                                 {importCost > 
                                 0 
@@ -3985,7 +3985,7 @@ export default function FuelTanks() {
                               </span> 
  
                               {entry.importReference && ( 
-                                <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                                <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                   Ref:{' '} 
                                   { 
                                     entry.importReference 
@@ -4000,31 +4000,31 @@ export default function FuelTanks() {
                           {isDriverFuel && ( 
                             <div className="mt-2 ml-0 flex flex-wrap gap-2"> 
                               {entry.driverId && ( 
-                                <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                                <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                   Driver ID: {entry.driverId.substring(0, 12)}... 
                                 </span> 
                               )} 
  
                               {entry.deliveryId && ( 
-                                <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                                <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                   Delivery: {entry.deliveryId} 
                                 </span> 
                               )} 
  
                               {entry.saleId && ( 
-                                <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                                <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                   Sale: {entry.saleId} 
                                 </span> 
                               )} 
  
                               {entry.customerName && ( 
-                                <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                                <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                   Customer: {entry.customerName} 
                                 </span> 
                               )} 
  
                               {entry.truckNumber && ( 
-                                <span className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1"> 
+                                <span className="text-sm bg-gray-100 text-gray-700 rounded px-2 py-1"> 
                                   Truck: {entry.truckNumber} 
                                 </span> 
                               )} 
@@ -4035,14 +4035,14 @@ export default function FuelTanks() {
                           <div className="mt-2 flex flex-wrap gap-2"> 
  
                             {(entry.adminName || entry.updatedBy) && (
-                              <span className="text-xs bg-indigo-100 text-indigo-700 rounded px-2 py-1">
+                              <span className="text-sm bg-indigo-100 text-indigo-700 rounded px-2 py-1">
                                 Admin: {entry.adminName || entry.updatedBy}
                               </span>
                             )}
                             {entry.previousTankAmount !== 
                               undefined && ( 
                               <span 
-                                className={`text-xs ${ 
+                                className={`text-sm ${ 
                                   userBackground === 
                                   'dark' 
                                     ? 'text-gray-400' 
@@ -4062,7 +4062,7 @@ export default function FuelTanks() {
                             )} 
  
                             {entry.capacityInfo && ( 
-                              <span className="text-xs text-purple-600 font-medium"> 
+                              <span className="text-sm text-purple-600 font-medium"> 
                                 {entry.capacityInfo} 
                               </span> 
                             )} 
@@ -4101,7 +4101,7 @@ export default function FuelTanks() {
           <div className="flex flex-wrap items-center justify-between gap-2"> 
             <div className="flex items-center space-x-4"> 
               <span 
-                className={`text-sm font-medium ${ 
+                className={`text-base font-medium ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-300' 
@@ -4112,7 +4112,7 @@ export default function FuelTanks() {
               </span> 
  
               <span 
-                className={`text-sm ${ 
+                className={`text-base ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-300' 
@@ -4123,7 +4123,7 @@ export default function FuelTanks() {
               </span> 
  
               <span 
-                className={`text-sm ${ 
+                className={`text-base ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-300' 
@@ -4134,7 +4134,7 @@ export default function FuelTanks() {
               </span> 
  
               <span 
-                className={`text-sm ${ 
+                className={`text-base ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-300' 
@@ -4145,7 +4145,7 @@ export default function FuelTanks() {
               </span> 
  
               <span 
-                className={`text-sm ${ 
+                className={`text-base ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-300' 
@@ -4158,7 +4158,7 @@ export default function FuelTanks() {
  
             <div className="flex items-center gap-3"> 
               <span 
-                className={`text-sm ${ 
+                className={`text-base ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-300' 
@@ -4168,7 +4168,7 @@ export default function FuelTanks() {
                 📦 Import = Fuel added to main tank 
               </span> 
               <span 
-                className={`text-sm ${ 
+                className={`text-base ${ 
                   userBackground === 
                   'dark' 
                     ? 'text-gray-300' 

@@ -531,16 +531,16 @@ export default function DriversPage() {
     <div
       className={`min-h-screen p-4 md:p-6 transition-colors duration-300 ${getBackgroundClass()}`}
     >
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full max-w-full mx-auto space-y-6">
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-3xl font-bold">
               Drivers
             </h1>
 
             <p
-              className={`text-sm mt-1 ${
+              className={`text-base mt-1 ${
                 userBackground === 'dark'
                   ? 'text-gray-400'
                   : 'text-gray-500'
@@ -553,7 +553,7 @@ export default function DriversPage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/drivers/add"
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2"
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-base font-medium transition flex items-center space-x-2"
             >
               <span>+</span>
               <span>Add Driver</span>
@@ -562,7 +562,7 @@ export default function DriversPage() {
         </div>
 
         {/* Search Bar */}
-        <div className="rounded-xl shadow-sm p-4 border bg-cyan-700 border-gray-200">
+        <div className="rounded-xl shadow-sm p-4 border bg-cyan-700 border-gray-200 w-full">
           <input
             type="text"
             placeholder="Search drivers by name, email, phone or plate number..."
@@ -570,7 +570,7 @@ export default function DriversPage() {
             onChange={(e) =>
               setSearchTerm(e.target.value)
             }
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-200 border-gray-300"
+            className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-200 border-gray-300 text-base"
           />
         </div>
 
@@ -580,17 +580,17 @@ export default function DriversPage() {
             userBackground === 'dark'
               ? 'border-gray-700'
               : 'border-gray-100'
-          } ${getCardClass()}`}
+          } ${getCardClass()} w-full`}
         >
           <div
             className={`p-6 border-b ${
               userBackground === 'dark'
                 ? 'border-gray-700'
                 : 'border-gray-200'
-            } flex justify-between items-center`}
+            } flex flex-wrap justify-between items-center gap-4`}
           >
             <h2
-              className={`text-lg font-semibold ${
+              className={`text-xl font-semibold ${
                 userBackground === 'dark'
                   ? 'text-white'
                   : 'text-gray-900'
@@ -600,7 +600,7 @@ export default function DriversPage() {
             </h2>
 
             <span
-              className={`text-sm ${
+              className={`text-base ${
                 userBackground === 'dark'
                   ? 'text-gray-400'
                   : 'text-gray-500'
@@ -610,8 +610,8 @@ export default function DriversPage() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[800px]">
               <thead
                 className={
                   userBackground === 'dark'
@@ -621,7 +621,7 @@ export default function DriversPage() {
               >
                 <tr>
                   <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-200'
@@ -631,7 +631,7 @@ export default function DriversPage() {
                   </th>
 
                   <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-200'
@@ -641,7 +641,7 @@ export default function DriversPage() {
                   </th>
 
                   <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-200'
@@ -651,7 +651,7 @@ export default function DriversPage() {
                   </th>
 
                   <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-200'
@@ -661,7 +661,7 @@ export default function DriversPage() {
                   </th>
 
                   <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-200'
@@ -671,7 +671,7 @@ export default function DriversPage() {
                   </th>
 
                   <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-200'
@@ -681,7 +681,7 @@ export default function DriversPage() {
                   </th>
 
                   <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-200'
@@ -703,7 +703,7 @@ export default function DriversPage() {
                   <tr>
                     <td
                       colSpan={7}
-                      className={`px-6 py-8 text-center ${
+                      className={`px-6 py-8 text-center text-base ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-500'
@@ -726,14 +726,14 @@ export default function DriversPage() {
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-semibold text-sm">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-semibold text-base">
                             {driver.name?.charAt(0) ||
                               '?'}
                           </div>
 
                           <div className="ml-3">
                             <div
-                              className={`text-sm font-medium ${
+                              className={`text-base font-medium ${
                                 userBackground ===
                                 'dark'
                                   ? 'text-white'
@@ -745,7 +745,7 @@ export default function DriversPage() {
                             </div>
 
                             <div
-                              className={`text-xs ${
+                              className={`text-sm ${
                                 userBackground ===
                                 'dark'
                                   ? 'text-gray-400'
@@ -760,7 +760,7 @@ export default function DriversPage() {
                       </td>
 
                       <td
-                        className={`px-6 py-4 whitespace-nowrap text-sm ${
+                        className={`px-6 py-4 whitespace-nowrap text-base ${
                           userBackground ===
                           'dark'
                             ? 'text-gray-300'
@@ -771,7 +771,7 @@ export default function DriversPage() {
                       </td>
 
                       <td
-                        className={`px-6 py-4 whitespace-nowrap text-sm ${
+                        className={`px-6 py-4 whitespace-nowrap text-base ${
                           userBackground ===
                           'dark'
                             ? 'text-gray-300'
@@ -782,7 +782,7 @@ export default function DriversPage() {
                       </td>
 
                       <td
-                        className={`px-6 py-4 whitespace-nowrap text-sm ${
+                        className={`px-6 py-4 whitespace-nowrap text-base ${
                           userBackground ===
                           'dark'
                             ? 'text-gray-300'
@@ -794,12 +794,12 @@ export default function DriversPage() {
                       </td>
 
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col space-y-0.5">
+                        <div className="flex flex-col space-y-1">
 
                           {driver.remainingFuel
                             ?.Petrol !==
                             undefined && (
-                            <span className="text-xs font-medium text-blue-600">
+                            <span className="text-sm font-medium text-blue-600">
                               ⛽{' '}
                               {formatFuelValue(
                                 driver
@@ -813,7 +813,7 @@ export default function DriversPage() {
                           {driver.remainingFuel
                             ?.Diesel !==
                             undefined && (
-                            <span className="text-xs font-medium text-green-600">
+                            <span className="text-sm font-medium text-green-600">
                               ⛽{' '}
                               {formatFuelValue(
                                 driver
@@ -827,7 +827,7 @@ export default function DriversPage() {
                           {driver.remainingFuel?.[
                             'V-Power'
                           ] !== undefined && (
-                            <span className="text-xs font-medium text-purple-600">
+                            <span className="text-sm font-medium text-purple-600">
                               ⛽{' '}
                               {formatFuelValue(
                                 driver
@@ -842,7 +842,7 @@ export default function DriversPage() {
                           {driver.remainingFuel
                             ?.Kerosene !==
                             undefined && (
-                            <span className="text-xs font-medium text-orange-600">
+                            <span className="text-sm font-medium text-orange-600">
                               ⛽{' '}
                               {formatFuelValue(
                                 driver
@@ -862,7 +862,7 @@ export default function DriversPage() {
                             ] &&
                             !driver.remainingFuel
                               ?.Kerosene && (
-                              <span className="text-xs text-gray-400">
+                              <span className="text-sm text-gray-400">
                                 No fuel data
                               </span>
                             )}
@@ -871,7 +871,7 @@ export default function DriversPage() {
 
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          className={`px-2 py-1 text-sm font-semibold rounded-full ${
                             driver.isOnline
                               ? 'bg-green-100 text-green-800'
                               : 'bg-gray-100 text-gray-800'
@@ -884,7 +884,7 @@ export default function DriversPage() {
 
                         {driver.status && (
                           <span
-                            className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                            className={`ml-2 px-2 py-1 text-sm font-semibold rounded-full ${
                               driver.status ===
                               'available'
                                 ? 'bg-blue-100 text-blue-800'
@@ -905,7 +905,7 @@ export default function DriversPage() {
                         )}
                       </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap text-base">
                         <Link
                           href={`/drivers/edit/${driver.id}`}
                           className="text-blue-600 hover:text-blue-800 mr-3 font-medium"

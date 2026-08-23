@@ -458,21 +458,21 @@ export default function SalesReport() {
     <div
       className={`min-h-screen p-4 md:p-6 transition-colors duration-300 ${getBackgroundClass()}`}
     >
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full max-w-full mx-auto">
 
-        <div className="space-y-6">
+        <div className="space-y-6 w-full">
 
           {/* HEADER */}
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
 
             <div>
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-3xl font-bold">
                 Sales Report
               </h1>
 
               <p
-                className={`text-sm mt-1 ${
+                className={`text-base mt-1 ${
                   userBackground === 'dark'
                     ? 'text-gray-400'
                     : 'text-gray-500'
@@ -484,7 +484,7 @@ export default function SalesReport() {
 
             <Link
               href="/reports"
-              className={`text-sm ${
+              className={`text-base ${
                 userBackground === 'dark'
                   ? 'text-gray-400 hover:text-gray-200'
                   : 'text-gray-500 hover:text-gray-700'
@@ -499,7 +499,7 @@ export default function SalesReport() {
 
           {/* SUMMARY CARDS */}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
 
             {/* TOTAL REVENUE */}
 
@@ -510,11 +510,11 @@ export default function SalesReport() {
                   : 'border-emerald-200'
               } ${getCardClass()} bg-emerald-500 dark:bg-emerald-900 hover:bg-emerald-600 dark:hover:bg-emerald-800 transition-all duration-300`}
             >
-              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-100 dark:text-emerald-300">
+              <p className="text-base font-semibold uppercase tracking-wider text-emerald-100 dark:text-emerald-300">
                 Total Revenue
               </p>
 
-              <p className="text-3xl font-bold text-white dark:text-emerald-100 mt-1">
+              <p className="text-4xl font-bold text-white dark:text-emerald-100 mt-1">
                 KES {totalStats.totalRevenue.toLocaleString()}
               </p>
             </div>
@@ -529,11 +529,11 @@ export default function SalesReport() {
                   : 'border-sky-200'
               } ${getCardClass()} bg-sky-500 dark:bg-sky-900 hover:bg-sky-600 dark:hover:bg-sky-800 transition-all duration-300`}
             >
-              <p className="text-sm font-semibold uppercase tracking-wider text-sky-100 dark:text-sky-300">
+              <p className="text-base font-semibold uppercase tracking-wider text-sky-100 dark:text-sky-300">
                 Total Litres Sold
               </p>
 
-              <p className="text-3xl font-bold text-white dark:text-sky-100 mt-1">
+              <p className="text-4xl font-bold text-white dark:text-sky-100 mt-1">
                 {totalStats.totalLitres.toLocaleString()}L
               </p>
             </div>
@@ -548,11 +548,11 @@ export default function SalesReport() {
                   : 'border-violet-200'
               } ${getCardClass()} bg-violet-500 dark:bg-violet-900 hover:bg-violet-600 dark:hover:bg-violet-800 transition-all duration-300`}
             >
-              <p className="text-sm font-semibold uppercase tracking-wider text-violet-100 dark:text-violet-300">
+              <p className="text-base font-semibold uppercase tracking-wider text-violet-100 dark:text-violet-300">
                 Total Orders
               </p>
 
-              <p className="text-3xl font-bold text-white dark:text-violet-100 mt-1">
+              <p className="text-4xl font-bold text-white dark:text-violet-100 mt-1">
                 {totalStats.totalOrders}
               </p>
             </div>
@@ -567,7 +567,7 @@ export default function SalesReport() {
               userBackground === 'dark'
                 ? 'border-gray-700'
                 : 'border-gray-200'
-            } ${getCardClass()}`}
+            } ${getCardClass()} w-full`}
           >
 
             {/* SALES HEADER */}
@@ -580,10 +580,10 @@ export default function SalesReport() {
               }`}
             >
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-4">
 
                 <h2
-                  className={`text-lg font-semibold ${
+                  className={`text-xl font-semibold ${
                     userBackground === 'dark'
                       ? 'text-white'
                       : 'text-gray-900'
@@ -592,7 +592,7 @@ export default function SalesReport() {
                   Sales History
 
                   <span
-                    className={`text-sm font-normal ml-2 ${
+                    className={`text-base font-normal ml-2 ${
                       userBackground === 'dark'
                         ? 'text-gray-400'
                         : 'text-gray-500'
@@ -613,7 +613,7 @@ export default function SalesReport() {
                 {hasMoreSales && (
                   <button
                     onClick={toggleShowAllSales}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium transition"
+                    className="text-base text-blue-600 hover:text-blue-800 font-medium transition"
                   >
                     {showAllSales
                       ? 'Show Less'
@@ -644,7 +644,7 @@ export default function SalesReport() {
                   <div>
 
                     <label
-                      className={`block text-xs font-medium ${
+                      className={`block text-sm font-medium ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-700'
@@ -659,7 +659,7 @@ export default function SalesReport() {
                       onChange={(e) =>
                         setDateFrom(e.target.value)
                       }
-                      className={`px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`px-3 py-1.5 border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         userBackground === 'dark'
                           ? 'bg-gray-700 text-white border-gray-600'
                           : 'bg-white border-gray-300'
@@ -674,7 +674,7 @@ export default function SalesReport() {
                   <div>
 
                     <label
-                      className={`block text-xs font-medium ${
+                      className={`block text-sm font-medium ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-700'
@@ -689,7 +689,7 @@ export default function SalesReport() {
                       onChange={(e) =>
                         setDateTo(e.target.value)
                       }
-                      className={`px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`px-3 py-1.5 border rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         userBackground === 'dark'
                           ? 'bg-gray-700 text-white border-gray-600'
                           : 'bg-white border-gray-300'
@@ -707,7 +707,7 @@ export default function SalesReport() {
                       isFiltering ||
                       (!dateFrom && !dateTo)
                     }
-                    className={`px-4 py-1.5 text-sm font-medium text-white rounded-lg transition ${
+                    className={`px-4 py-1.5 text-base font-medium text-white rounded-lg transition ${
                       isFiltering ||
                       (!dateFrom && !dateTo)
                         ? 'bg-gray-400 cursor-not-allowed'
@@ -725,7 +725,7 @@ export default function SalesReport() {
                   {(dateFrom || dateTo) && (
                     <button
                       onClick={resetDateFilter}
-                      className={`px-4 py-1.5 text-sm font-medium rounded-lg transition ${
+                      className={`px-4 py-1.5 text-base font-medium rounded-lg transition ${
                         userBackground === 'dark'
                           ? 'text-gray-300 bg-gray-700 hover:bg-gray-600'
                           : 'text-gray-700 bg-gray-200 hover:bg-gray-300'
@@ -743,9 +743,9 @@ export default function SalesReport() {
 
             {/* TABLE */}
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto w-full">
 
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
 
                 <thead
                   className={
@@ -758,7 +758,7 @@ export default function SalesReport() {
                   <tr>
 
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-200'
@@ -768,7 +768,7 @@ export default function SalesReport() {
                     </th>
 
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-200'
@@ -778,7 +778,7 @@ export default function SalesReport() {
                     </th>
 
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-200'
@@ -788,7 +788,7 @@ export default function SalesReport() {
                     </th>
 
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-200'
@@ -798,7 +798,7 @@ export default function SalesReport() {
                     </th>
 
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${
                         userBackground === 'dark'
                           ? 'text-gray-400'
                           : 'text-gray-200'
@@ -826,7 +826,7 @@ export default function SalesReport() {
 
                       <td
                         colSpan={5}
-                        className={`px-6 py-8 text-center ${
+                        className={`px-6 py-8 text-center text-base ${
                           userBackground === 'dark'
                             ? 'text-gray-400'
                             : 'text-gray-500'
@@ -867,7 +867,7 @@ export default function SalesReport() {
                           {/* DATE */}
 
                           <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            className={`px-6 py-4 whitespace-nowrap text-base ${
                               userBackground === 'dark'
                                 ? 'text-gray-400'
                                 : 'text-gray-500'
@@ -882,7 +882,7 @@ export default function SalesReport() {
                           {/* DRIVER */}
 
                           <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            className={`px-6 py-4 whitespace-nowrap text-base ${
                               userBackground === 'dark'
                                 ? 'text-white'
                                 : 'text-gray-900'
@@ -895,7 +895,7 @@ export default function SalesReport() {
                           {/* FUEL */}
 
                           <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            className={`px-6 py-4 whitespace-nowrap text-base ${
                               userBackground === 'dark'
                                 ? 'text-white'
                                 : 'text-gray-900'
@@ -908,7 +908,7 @@ export default function SalesReport() {
                           {/* LITRES */}
 
                           <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            className={`px-6 py-4 whitespace-nowrap text-base ${
                               userBackground === 'dark'
                                 ? 'text-white'
                                 : 'text-gray-900'
@@ -921,7 +921,7 @@ export default function SalesReport() {
                           {/* AMOUNT */}
 
                           <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                            className={`px-6 py-4 whitespace-nowrap text-base font-medium ${
                               userBackground === 'dark'
                                 ? 'text-white'
                                 : 'text-gray-900'

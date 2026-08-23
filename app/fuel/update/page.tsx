@@ -707,20 +707,20 @@ export default function UpdateFuel() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>⛽ Update Driver Fuel</h1>
-            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Update fuel levels for individual drivers</p>
+            <h1 className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>⛽ Update Driver Fuel</h1>
+            <p className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Update fuel levels for individual drivers</p>
             {selectedDriverName && (
-              <p className={`text-sm text-blue-600 mt-1`}>Selected: <strong>{selectedDriverName}</strong></p>
+              <p className={`text-base text-blue-600 mt-1`}>Selected: <strong>{selectedDriverName}</strong></p>
             )}
           </div>
           <div className="flex space-x-3">
-            <Link href="/fuel" className={`text-sm ${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} flex items-center space-x-1`}>
+            <Link href="/fuel" className={`text-base ${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} flex items-center space-x-1`}>
               <span>←</span>
               <span>Back to Fuel</span>
             </Link>
             <button
               onClick={() => setShowCreateDriver(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition"
+              className="px-4 py-2.5 text-base font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition"
             >
               + Add Driver
             </button>
@@ -730,11 +730,11 @@ export default function UpdateFuel() {
         <div className={`rounded-xl shadow-sm p-6 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
           <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
             <div>
-              <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Select Driver</label>
+              <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Select Driver</label>
               <select
                 value={selectedDriverId}
                 onChange={(e) => handleDriverSelect(e.target.value)}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
               >
                 <option value="">Select a driver...</option>
                 {drivers.map(driver => {
@@ -761,19 +761,19 @@ export default function UpdateFuel() {
                     
                     return (
                       <div key={fuelType}>
-                        <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                        <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                           {fuelType} (Litres)
                         </label>
                         <input
                           type="number"
                           value={fuelData[fuelType]}
                           onChange={(e) => handleFuelChange(fuelType, e.target.value)}
-                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                          className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                           step="1"
                           min="0"
                         />
                         {difference !== 0 && (
-                          <p className={`text-xs mt-1 ${difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <p className={`text-sm mt-1 ${difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {difference > 0 ? '+' : ''}{difference.toFixed(0)}L from previous
                           </p>
                         )}
@@ -787,14 +787,14 @@ export default function UpdateFuel() {
                   const totalFuel = Object.values(fuelData).reduce((sum, val) => sum + Number(val), 0);
                   return (
                     <div className={`rounded-lg p-3 border ${hasFuel ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                      <p className={`text-sm ${hasFuel ? 'text-green-700' : 'text-red-700'}`}>
+                      <p className={`text-base ${hasFuel ? 'text-green-700' : 'text-red-700'}`}>
                         <span className="font-semibold">Fuel Summary:</span> {getFuelSummaryFlutter(fuelData)}
                       </p>
-                      <p className="text-xs mt-1 text-gray-600">
+                      <p className="text-sm mt-1 text-gray-600">
                         Total: {totalFuel.toFixed(0)}L
                         {hasFuel ? ' ✅ Available for online' : ' ❌ Need at least 10L of any fuel to go online'}
                       </p>
-                      <p className="text-xs mt-1 text-gray-400">
+                      <p className="text-sm mt-1 text-gray-400">
                         * Flutter requires any fuel type &gt; 10L to go online
                       </p>
                     </div>
@@ -806,7 +806,7 @@ export default function UpdateFuel() {
                     <button
                       type="button"
                       onClick={() => viewDriverHistory(selectedDriverId)}
-                      className={`px-4 py-2 text-sm font-medium ${userBackground === 'dark' ? 'text-blue-400 bg-blue-900/30 hover:bg-blue-900/50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'} rounded-lg transition`}
+                      className={`px-4 py-2.5 text-base font-medium ${userBackground === 'dark' ? 'text-blue-400 bg-blue-900/30 hover:bg-blue-900/50' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'} rounded-lg transition`}
                     >
                       📜 View History
                     </button>
@@ -814,7 +814,7 @@ export default function UpdateFuel() {
                       type="button"
                       onClick={handleForceRefresh}
                       disabled={loading}
-                      className={`px-4 py-2 text-sm font-medium ${userBackground === 'dark' ? 'text-orange-400 bg-orange-900/30 hover:bg-orange-900/50' : 'text-orange-600 bg-orange-50 hover:bg-orange-100'} rounded-lg transition disabled:opacity-50`}
+                      className={`px-4 py-2.5 text-base font-medium ${userBackground === 'dark' ? 'text-orange-400 bg-orange-900/30 hover:bg-orange-900/50' : 'text-orange-600 bg-orange-50 hover:bg-orange-100'} rounded-lg transition disabled:opacity-50`}
                     >
                       🔄 Force Refresh
                     </button>
@@ -829,14 +829,14 @@ export default function UpdateFuel() {
                         setSelectedDriverName('');
                         lastSelectedIdRef.current = '';
                       }}
-                      className={`px-4 py-2 text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition`}
+                      className={`px-4 py-2.5 text-base font-medium ${userBackground === 'dark' ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition`}
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition disabled:opacity-50"
+                      className="px-4 py-2.5 text-base font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition disabled:opacity-50"
                     >
                       {loading ? 'Updating...' : 'Update Fuel'}
                     </button>
@@ -852,7 +852,7 @@ export default function UpdateFuel() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className={`rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto ${getCardClass()}`}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Driver Fuel History</h3>
+                <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Driver Fuel History</h3>
                 <button
                   onClick={() => setShowHistory(false)}
                   className={`${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
@@ -870,23 +870,23 @@ export default function UpdateFuel() {
                     <div key={idx} className={`border rounded-lg p-4 ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          <p className={`text-base font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                             {entry.date ? new Date(entry.date).toLocaleString() : new Date(entry.timestamp).toLocaleString()}
                           </p>
-                          <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Updated by: {entry.updatedBy || 'Admin'}</p>
+                          <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Updated by: {entry.updatedBy || 'Admin'}</p>
                         </div>
                         <div className="text-right">
                           {entry.totalAdded > 0 && (
-                            <span className="text-xs text-green-600">+{entry.totalAdded.toFixed(0)}L added</span>
+                            <span className="text-sm text-green-600">+{entry.totalAdded.toFixed(0)}L added</span>
                           )}
                           {entry.totalRemoved > 0 && (
-                            <span className="text-xs text-red-600">-{entry.totalRemoved.toFixed(0)}L removed</span>
+                            <span className="text-sm text-red-600">-{entry.totalRemoved.toFixed(0)}L removed</span>
                           )}
                         </div>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {entry.fuelUpdates && entry.fuelUpdates.map((update, uidx) => (
-                          <span key={uidx} className={`text-xs px-2 py-1 rounded ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                          <span key={uidx} className={`text-sm px-2 py-1 rounded ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                             {update.fuelType}: 
                             <span className={update.addedAmount > 0 ? 'text-green-600' : 'text-red-600'}>
                               {update.addedAmount > 0 ? '+' : ''}{update.addedAmount.toFixed(0)}L
@@ -894,7 +894,7 @@ export default function UpdateFuel() {
                           </span>
                         ))}
                         {entry.fuelAvailable && (
-                          <span className="text-xs bg-blue-50 px-2 py-1 rounded text-blue-700">
+                          <span className="text-sm bg-blue-50 px-2 py-1 rounded text-blue-700">
                             {entry.fuelAvailable}
                           </span>
                         )}
@@ -913,10 +913,10 @@ export default function UpdateFuel() {
             <div className={`rounded-xl p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto ${getCardClass()}`}>
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     📊 Fuel Top-ups for {new Date(dateFilter).toLocaleDateString()}
                   </h3>
-                  <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                     {dateFilteredHistory.driverHistory?.reduce((sum, d) => sum + d.history.length, 0) || 0} top-up(s) found
                   </p>
                 </div>
@@ -931,8 +931,8 @@ export default function UpdateFuel() {
               {!dateFilteredHistory.driverHistory || dateFilteredHistory.driverHistory.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">🔍</div>
-                  <h4 className={`text-lg font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>No fuel top-ups found</h4>
-                  <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-1`}>No drivers received fuel on {new Date(dateFilter).toLocaleDateString()}</p>
+                  <h4 className={`text-xl font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>No fuel top-ups found</h4>
+                  <p className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-1`}>No drivers received fuel on {new Date(dateFilter).toLocaleDateString()}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -940,15 +940,15 @@ export default function UpdateFuel() {
                     <div key={`driver-${idx}`} className={`border rounded-lg p-4 ${userBackground === 'dark' ? 'border-blue-700 bg-blue-900/20' : 'border-blue-200 bg-blue-50'}`}>
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className={`text-sm font-semibold ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-800'}`}>
+                          <p className={`text-base font-semibold ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-800'}`}>
                             🚛 {driverEntry.driverName}
                           </p>
-                          <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                          <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                             {driverEntry.history.length} top-up(s) on this day
                           </p>
                         </div>
                         <div className="text-right">
-                          <span className={`text-xs font-medium ${userBackground === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                          <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
                             +{driverEntry.history.reduce((sum, entry) => sum + (entry.totalAdded || 0), 0).toFixed(0)}L total
                           </span>
                         </div>
@@ -964,20 +964,20 @@ export default function UpdateFuel() {
                           <div key={`entry-${hidx}`} className={`mt-2 p-3 rounded border ${userBackground === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                             <div className="flex justify-between items-start">
                               <div>
-                                <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                                <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                                   {date ? new Date(date).toLocaleTimeString() : 'N/A'}
                                 </p>
-                                <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                                <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                                   Updated by: {entry.updatedBy || 'Admin'}
                                 </p>
                               </div>
                               <div className="text-right">
                                 {isAdd ? (
-                                  <span className="text-sm font-bold text-green-600">
+                                  <span className="text-base font-bold text-green-600">
                                     +{amount.toFixed(0)}L {fuelType}
                                   </span>
                                 ) : (
-                                  <span className="text-sm font-bold text-red-600">
+                                  <span className="text-base font-bold text-red-600">
                                     -{amount.toFixed(0)}L {fuelType}
                                   </span>
                                 )}
@@ -991,7 +991,7 @@ export default function UpdateFuel() {
                                   const updateAmount = Math.abs(update.addedAmount || update.amount || 0);
                                   if (updateAmount === 0) return null;
                                   return (
-                                    <span key={uidx} className={`text-xs px-2 py-1 rounded ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                    <span key={uidx} className={`text-sm px-2 py-1 rounded ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                                       {update.fuelType}: 
                                       <span className={isAddUpdate ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
                                         {isAddUpdate ? '+' : '-'}{updateAmount.toFixed(0)}L
@@ -1005,7 +1005,7 @@ export default function UpdateFuel() {
                                   );
                                 })
                               ) : entry.fuelType && entry.amount ? (
-                                <span className={`text-xs px-2 py-1 rounded ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                <span className={`text-sm px-2 py-1 rounded ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                                   {entry.fuelType}: 
                                   <span className={isAdd ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
                                     {isAdd ? '+' : '-'}{entry.amount.toFixed(0)}L
@@ -1014,7 +1014,7 @@ export default function UpdateFuel() {
                               ) : null}
                               
                               {entry.fuelAvailable && (
-                                <span className="text-xs bg-blue-50 px-2 py-1 rounded text-blue-700">
+                                <span className="text-sm bg-blue-50 px-2 py-1 rounded text-blue-700">
                                   📊 {entry.fuelAvailable}
                                 </span>
                               )}
@@ -1022,7 +1022,7 @@ export default function UpdateFuel() {
                             
                             {entry.remainingFuelAfter && (
                               <div className="mt-2 pt-2 border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'}">
-                                <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                                <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                                   Remaining: {Object.entries(entry.remainingFuelAfter).map(([key, val]) => 
                                     `${key}: ${Number(val).toFixed(0)}L`
                                   ).join(' • ')}
@@ -1038,7 +1038,7 @@ export default function UpdateFuel() {
               )}
               
               <div className="mt-4 pt-4 border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'}">
-                <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
+                <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
                   💡 Showing all drivers who received fuel top-ups on {new Date(dateFilter).toLocaleDateString()}
                 </p>
               </div>
@@ -1051,7 +1051,7 @@ export default function UpdateFuel() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className={`rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto ${getCardClass()}`}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Add New Driver</h3>
+                <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>Add New Driver</h3>
                 <button
                   onClick={() => setShowCreateDriver(false)}
                   className={`${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
@@ -1064,42 +1064,42 @@ export default function UpdateFuel() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Full Name *</label>
+                      <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Full Name *</label>
                       <input
                         type="text"
                         value={newDriver.name}
                         onChange={(e) => setNewDriver({...newDriver, name: e.target.value})}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                        className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                         required
                       />
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Email *</label>
+                      <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Email *</label>
                       <input
                         type="email"
                         value={newDriver.email}
                         onChange={(e) => setNewDriver({...newDriver, email: e.target.value})}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                        className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                         required
                       />
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Phone *</label>
+                      <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Phone *</label>
                       <input
                         type="text"
                         value={newDriver.phone}
                         onChange={(e) => setNewDriver({...newDriver, phone: e.target.value})}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                        className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                         placeholder="0712345678"
                         required
                       />
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Vehicle Type</label>
+                      <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Vehicle Type</label>
                       <select
                         value={newDriver.vehicleType}
                         onChange={(e) => setNewDriver({...newDriver, vehicleType: e.target.value})}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                        className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                       >
                         <option value="Pending Assignment">Pending Assignment</option>
                         <option value="Fuel Truck">Fuel Truck</option>
@@ -1110,66 +1110,66 @@ export default function UpdateFuel() {
                       </select>
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Number Plate</label>
+                      <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Number Plate</label>
                       <input
                         type="text"
                         value={newDriver.numberPlate}
                         onChange={(e) => setNewDriver({...newDriver, numberPlate: e.target.value.toUpperCase()})}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                        className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                         placeholder="KDN 123E"
                       />
                     </div>
                   </div>
 
                   <div className="border-t pt-4">
-                    <h4 className={`text-md font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-3`}>⛽ Initial Fuel</h4>
+                    <h4 className={`text-lg font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-3`}>⛽ Initial Fuel</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Petrol (L)</label>
+                        <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Petrol (L)</label>
                         <input
                           type="number"
                           value={newDriver.petrol}
                           onChange={(e) => setNewDriver({...newDriver, petrol: parseFloat(e.target.value) || 0})}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                          className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                           step="1"
                           min="0"
                         />
                       </div>
                       <div>
-                        <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Diesel (L)</label>
+                        <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Diesel (L)</label>
                         <input
                           type="number"
                           value={newDriver.diesel}
                           onChange={(e) => setNewDriver({...newDriver, diesel: parseFloat(e.target.value) || 0})}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                          className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                           step="1"
                           min="0"
                         />
                       </div>
                       <div>
-                        <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Kerosene (L)</label>
+                        <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Kerosene (L)</label>
                         <input
                           type="number"
                           value={newDriver.kerosene}
                           onChange={(e) => setNewDriver({...newDriver, kerosene: parseFloat(e.target.value) || 0})}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                          className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                           step="1"
                           min="0"
                         />
                       </div>
                       <div>
-                        <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>V-Power (L)</label>
+                        <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>V-Power (L)</label>
                         <input
                           type="number"
                           value={newDriver.vpower}
                           onChange={(e) => setNewDriver({...newDriver, vpower: parseFloat(e.target.value) || 0})}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                          className={`w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                           step="1"
                           min="0"
                         />
                       </div>
                     </div>
-                    <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'} mt-2`}>
+                    <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'} mt-2`}>
                       * Driver needs at least 10L of any fuel to go online (matches Flutter)
                     </p>
                   </div>
@@ -1178,14 +1178,14 @@ export default function UpdateFuel() {
                     <button
                       type="button"
                       onClick={() => setShowCreateDriver(false)}
-                      className={`px-4 py-2 text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition`}
+                      className={`px-4 py-2.5 text-base font-medium ${userBackground === 'dark' ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition`}
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={createLoading}
-                      className="px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition disabled:opacity-50"
+                      className="px-4 py-2.5 text-base font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition disabled:opacity-50"
                     >
                       {createLoading ? 'Creating...' : 'Create Driver'}
                     </button>
@@ -1198,14 +1198,14 @@ export default function UpdateFuel() {
 
         {/* Date Filter Section */}
         <div className={`rounded-xl shadow-sm p-6 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} ${getCardClass()}`}>
-          <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>📅 Check Fuel Top-ups by Date</h2>
+          <h2 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>📅 Check Fuel Top-ups by Date</h2>
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Select Date</label>
+              <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Select Date</label>
               <input
                 type="date"
                 id="historyDate"
-                className={`px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
+                className={`px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'}`}
                 onChange={(e) => setDateFilter(e.target.value)}
               />
             </div>
@@ -1219,17 +1219,17 @@ export default function UpdateFuel() {
                 checkFuelHistoryByDate(dateInput.value);
               }}
               disabled={isFiltering}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50 mt-5"
+              className="px-4 py-2.5 text-base font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50 mt-6"
             >
               {isFiltering ? 'Checking...' : '🔍 Check Top-ups'}
             </button>
             {dateFilter && (
-              <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-5`}>
+              <span className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-6`}>
                 Showing top-ups for: <strong>{new Date(dateFilter).toLocaleDateString()}</strong>
               </span>
             )}
           </div>
-          <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'} mt-2`}>
+          <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'} mt-2`}>
             * Shows all drivers who received fuel top-ups on the selected date
           </p>
         </div>

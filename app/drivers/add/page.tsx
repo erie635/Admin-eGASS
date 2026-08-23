@@ -763,14 +763,14 @@ export default function AddDriver() {
         <div className={`rounded-lg p-4 md:p-6 transition-colors duration-300 ${getCardClass()}`}>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold">Add New Driver</h1>
-              <p className={`text-sm mt-1 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <h1 className="text-3xl font-bold">Add New Driver</h1>
+              <p className={`text-base mt-1 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                 Create a new driver account with complete details
               </p>
             </div>
             <Link
               href="/drivers"
-              className={`text-sm ${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} flex items-center space-x-1`}
+              className={`text-base ${userBackground === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} flex items-center space-x-1`}
             >
               <span>←</span>
               <span>Back to Drivers</span>
@@ -780,7 +780,7 @@ export default function AddDriver() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Profile Photo Section */}
             <div className={`border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} pb-6`}>
-              <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Profile Photo</h3>
+              <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Profile Photo</h3>
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative">
                   <div className={`w-32 h-32 rounded-full overflow-hidden ${userBackground === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} border-2 ${userBackground === 'dark' ? 'border-gray-600' : 'border-gray-200'}`}>
@@ -802,7 +802,7 @@ export default function AddDriver() {
                     <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
                       <div className="flex flex-col items-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                        <span className="text-white text-xs mt-1">{uploadProgress}%</span>
+                        <span className="text-white text-sm mt-1">{uploadProgress}%</span>
                       </div>
                     </div>
                   )}
@@ -820,7 +820,7 @@ export default function AddDriver() {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingPhoto || loading}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+                    className="px-4 py-2 text-base font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
                   >
                     📁 Select Photo
                   </button>
@@ -834,34 +834,34 @@ export default function AddDriver() {
                           fileInputRef.current.value = '';
                         }
                       }}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                      className="px-4 py-2 text-base font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                     >
                       ✖ Remove Selection
                     </button>
                   )}
                 </div>
                 {selectedFile && (
-                  <p className="text-xs text-green-600">
+                  <p className="text-sm text-green-600">
                     📄 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB) - Will be uploaded when you save
                   </p>
                 )}
-                <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Max 5MB (JPEG, PNG, GIF, WebP)</p>
+                <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Max 5MB (JPEG, PNG, GIF, WebP)</p>
               </div>
             </div>
 
             {/* Basic Information */}
             <div className={`border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} pb-6`}>
-              <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Basic Information</h3>
+              <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Basic Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Full Name *
                   </label>
                   <input
                     type="text"
                     name="name"
                     required
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="John Doe"
                     value={formData.name}
                     onChange={handleChange}
@@ -869,41 +869,41 @@ export default function AddDriver() {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Email *
                   </label>
                   <input
                     type="email"
                     name="email"
                     required
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${emailError ? 'border-red-500 bg-red-50' : userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${emailError ? 'border-red-500 bg-red-50' : userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'
                       }`}
                     placeholder="john@example.com"
                     value={formData.email}
                     onChange={handleChange}
                   />
                   {emailChecking && (
-                    <p className="text-xs text-blue-500 mt-1">🔍 Checking email...</p>
+                    <p className="text-sm text-blue-500 mt-1">🔍 Checking email...</p>
                   )}
                   {networkError && (
-                    <p className="text-xs text-amber-500 mt-1">🌐 Network issue - Retrying...</p>
+                    <p className="text-sm text-amber-500 mt-1">🌐 Network issue - Retrying...</p>
                   )}
                   {emailAvailabilityMessage && !emailChecking && (
-                    <p className={`text-xs mt-1 ${emailAvailabilityMessage.includes('❌') || emailAvailabilityMessage.includes('⚠️') ? 'text-red-500' : emailAvailabilityMessage.includes('✅') ? 'text-green-500' : 'text-blue-500'}`}>
+                    <p className={`text-sm mt-1 ${emailAvailabilityMessage.includes('❌') || emailAvailabilityMessage.includes('⚠️') ? 'text-red-500' : emailAvailabilityMessage.includes('✅') ? 'text-green-500' : 'text-blue-500'}`}>
                       {emailAvailabilityMessage}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Phone Number *
                   </label>
                   <input
                     type="tel"
                     name="phone"
                     required
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="0712345678"
                     value={formData.phone}
                     onChange={handleChange}
@@ -911,13 +911,13 @@ export default function AddDriver() {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     License Number
                   </label>
                   <input
                     type="text"
                     name="license"
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="DL-123456"
                     value={formData.license}
                     onChange={handleChange}
@@ -925,13 +925,13 @@ export default function AddDriver() {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Vehicle Type
                   </label>
                   <input
                     type="text"
                     name="vehicleType"
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="Truck, Van, Car"
                     value={formData.vehicleType}
                     onChange={handleChange}
@@ -939,13 +939,13 @@ export default function AddDriver() {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Number Plate
                   </label>
                   <input
                     type="text"
                     name="numberPlate"
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="KCA 123A"
                     value={formData.numberPlate}
                     onChange={handleChange}
@@ -953,13 +953,13 @@ export default function AddDriver() {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Price Per KM (KES)
                   </label>
                   <input
                     type="number"
                     name="pricePerKm"
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="0"
                     value={formData.pricePerKm}
                     onChange={handleChange}
@@ -971,49 +971,49 @@ export default function AddDriver() {
 
             {/* Password Section */}
             <div className={`border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} pb-6`}>
-              <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>🔐 Set Password</h3>
+              <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>🔐 Set Password</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Password *
                   </label>
                   <input
                     type="password"
                     name="password"
                     required
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${passwordError ? 'border-red-500 bg-red-50' : userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${passwordError ? 'border-red-500 bg-red-50' : userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'
                       }`}
                     placeholder="Enter password (min 6 characters)"
                     value={formData.password}
                     onChange={handleChange}
                   />
                   {passwordError && (
-                    <p className="text-xs text-red-500 mt-1">⚠️ Password must be at least 6 characters</p>
+                    <p className="text-sm text-red-500 mt-1">⚠️ Password must be at least 6 characters</p>
                   )}
                   {!passwordError && formData.password && formData.password.length >= 6 && (
-                    <p className="text-xs text-green-500 mt-1">✅ Password strength: Good</p>
+                    <p className="text-sm text-green-500 mt-1">✅ Password strength: Good</p>
                   )}
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Confirm Password *
                   </label>
                   <input
                     type="password"
                     name="confirmPassword"
                     required
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${passwordMatchError ? 'border-red-500 bg-red-50' : userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base ${passwordMatchError ? 'border-red-500 bg-red-50' : userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'
                       }`}
                     placeholder="Confirm password"
                     value={formData.confirmPassword}
                     onChange={handleChange}
                   />
                   {passwordMatchError && (
-                    <p className="text-xs text-red-500 mt-1">⚠️ Passwords do not match</p>
+                    <p className="text-sm text-red-500 mt-1">⚠️ Passwords do not match</p>
                   )}
                   {!passwordMatchError && formData.confirmPassword && formData.password === formData.confirmPassword && (
-                    <p className="text-xs text-green-500 mt-1">✅ Passwords match</p>
+                    <p className="text-sm text-green-500 mt-1">✅ Passwords match</p>
                   )}
                 </div>
               </div>
@@ -1021,16 +1021,16 @@ export default function AddDriver() {
 
             {/* Initial Fuel Stock */}
             <div className={`border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} pb-6`}>
-              <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Initial Fuel Stock</h3>
+              <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Initial Fuel Stock</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {['Petrol', 'Diesel', 'Kerosene', 'V-Power'].map((fuelType) => (
                   <div key={fuelType}>
-                    <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                    <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                       {fuelType} (Litres)
                     </label>
                     <input
                       type="number"
-                      className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                      className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                       placeholder="0"
                       value={formData.remainingFuel[fuelType] || ''}
                       onChange={(e) => handleFuelChange(fuelType, e.target.value)}
@@ -1045,39 +1045,39 @@ export default function AddDriver() {
 
             {/* Status & Availability */}
             <div className={`border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} pb-6`}>
-              <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Status & Availability</h3>
+              <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Status & Availability</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex items-center space-x-3 pt-2">
                   <input
                     type="checkbox"
                     name="isOnline"
-                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     checked={formData.isOnline}
                     onChange={handleChange}
                   />
-                  <label className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Driver is Online</label>
+                  <label className={`text-base ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Driver is Online</label>
                 </div>
 
                 <div className="flex items-center space-x-3 pt-2">
                   <input
                     type="checkbox"
                     name="isAvailable"
-                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     checked={formData.isAvailable}
                     onChange={handleChange}
                   />
-                  <label className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Driver is Available</label>
+                  <label className={`text-base ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Driver is Available</label>
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Status
                   </label>
                   <select
                     name="status"
                     value={formData.status}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                   >
                     <option value="available">Available</option>
                     <option value="busy">Busy</option>
@@ -1090,16 +1090,16 @@ export default function AddDriver() {
 
             {/* Initial Location */}
             <div className={`border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'} pb-6`}>
-              <h3 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Initial Location</h3>
+              <h3 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Initial Location</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Latitude
                   </label>
                   <input
                     type="number"
                     name="lat"
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="0"
                     value={formData.lat}
                     onChange={handleChange}
@@ -1108,13 +1108,13 @@ export default function AddDriver() {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Longitude
                   </label>
                   <input
                     type="number"
                     name="lng"
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="0"
                     value={formData.lng}
                     onChange={handleChange}
@@ -1123,13 +1123,13 @@ export default function AddDriver() {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className={`block text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Heading
                   </label>
                   <input
                     type="number"
                     name="heading"
-                    className={`w-full px-4 py-2 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full px-4 py-2.5 border ${userBackground === 'dark' ? 'bg-gray-700 text-white border-gray-600' : 'bg-white border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-base`}
                     placeholder="0"
                     value={formData.heading}
                     onChange={handleChange}
@@ -1141,7 +1141,7 @@ export default function AddDriver() {
 
             {/* Info Box */}
             <div className="p-4 rounded-lg bg-cyan-700 border border-blue-700 text-white">
-              <p className="text-sm">
+              <p className="text-base">
                 ℹ️ Driver will be created with:
                 <br />
                 • Db Auth account with the password you set
@@ -1162,14 +1162,14 @@ export default function AddDriver() {
             <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
               <Link
                 href="/drivers"
-                className={`px-4 py-2 text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition`}
+                className={`px-4 py-2.5 text-base font-medium ${userBackground === 'dark' ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition`}
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={!isFormValid()}
-                className={`px-6 py-2 text-sm font-medium text-white rounded-lg transition ${isFormValid()
+                className={`px-6 py-2.5 text-base font-medium text-white rounded-lg transition ${isFormValid()
                   ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
                   : 'bg-gray-400 cursor-not-allowed opacity-50'
                   }`}
@@ -1190,9 +1190,9 @@ export default function AddDriver() {
 
             {/* Form validation status */}
             {!isFormValid() && (
-              <div className="text-xs text-amber-600 mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="text-sm text-amber-600 mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
                 ⚠️ Please fix the following before adding driver:
-                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                <ul className="list-disc list-inside mt-1 space-y-0.5 text-base">
                   {!formData.name && <li>Full Name is required</li>}
                   {!formData.email && <li>Email is required</li>}
                   {formData.email && !emailValidFormat && <li>Please enter a valid email address</li>}

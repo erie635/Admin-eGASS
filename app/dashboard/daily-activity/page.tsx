@@ -12,15 +12,14 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 interface DailyActivity {
   id: string;
-  // Internal Firebase ID - KEEP THIS FOR DATABASE RELATIONSHIPS
   driverId: string;
-  // Public/custom driver ID - DISPLAY THIS IN THE UI
   driverCode?: string;
   driverName: string;
   numberPlate?: string;
@@ -101,26 +100,19 @@ export default function DailyActivityPage() {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
 
-  // Use refs for component lifecycle management
   const isMountedRef = useRef(true);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const driverUnsubscribeRef = useRef<(() => void) | null>(null);
+  
+  // Track which drivers are currently being processed to prevent concurrent updates
+  const processingDrivers = useRef<Set<string>>(new Set());
 
-  // ============================================================
-  // DRIVER CODE CONFIGURATION
-  // ============================================================
   const DRIVER_CODE_PREFIX = 'EGD';
 
-  /**
-   * Creates the public driver code.
-   */
   const createDriverCode = (number: number): string => {
     return `${DRIVER_CODE_PREFIX}-${String(number).padStart(5, '0')}`;
   };
 
-  /**
-   * Get an existing custom driver code from the driver document.
-   */
   const getExistingDriverCode = (driverData: any): string | null => {
     const possibleCode =
       driverData?.driverCode ||
@@ -137,9 +129,6 @@ export default function DailyActivityPage() {
     return null;
   };
 
-  /**
-   * Ensure every driver has a permanent public driver code with retry logic
-   */
   const ensureDriverCode = async (
     driverId: string,
     driverData: any,
@@ -209,7 +198,6 @@ export default function DailyActivityPage() {
 
       return assignedCode;
     } catch (error: any) {
-      // If it's a transaction conflict, retry up to 3 times
       if (
         error.code === 'failed-precondition' &&
         retryCount < 3
@@ -223,10 +211,6 @@ export default function DailyActivityPage() {
       return 'PENDING';
     }
   };
-
-  // ============================================================
-  // FETCH USER BACKGROUND
-  // ============================================================
 
   useEffect(() => {
     const fetchUserBackground = async () => {
@@ -249,10 +233,6 @@ export default function DailyActivityPage() {
     fetchUserBackground();
   }, []);
 
-  // ============================================================
-  // REAL-TIME CLOCK
-  // ============================================================
-
   useEffect(() => {
     const interval = setInterval(() => {
       if (isMountedRef.current) {
@@ -264,10 +244,6 @@ export default function DailyActivityPage() {
       clearInterval(interval);
     };
   }, []);
-
-  // ============================================================
-  // BACKGROUND
-  // ============================================================
 
   const getBackgroundClass = () => {
     switch (userBackground) {
@@ -282,10 +258,6 @@ export default function DailyActivityPage() {
     }
   };
 
-  // ============================================================
-  // CARD
-  // ============================================================
-
   const getCardClass = () => {
     switch (userBackground) {
       case 'dark':
@@ -298,10 +270,6 @@ export default function DailyActivityPage() {
         return 'bg-white shadow-lg';
     }
   };
-
-  // ============================================================
-  // TIMESTAMP HELPERS
-  // ============================================================
 
   const getTimestamp = (value: any): Date | null => {
     if (!value) return null;
@@ -319,10 +287,6 @@ export default function DailyActivityPage() {
     return serverTimestamp();
   };
 
-  // ============================================================
-  // DRIVER HOURS (DISPLAY FIX - SHOW ENTIRE DAY'S ACCUMULATED TIME)
-  // ============================================================
-
   const calculateDriverHours = (
     activity: DailyActivity
   ): { hours: number; minutes: number } => {
@@ -330,8 +294,6 @@ export default function DailyActivityPage() {
     const now = currentTime;
 
     try {
-      // totalMinutes is persisted by the listener. If the driver is currently
-      // online, only show the small amount since the last persisted checkpoint.
       if (activity.isOnline) {
         const checkpoint = getTimestamp(activity.lastAccumulatedAt);
         const start = checkpoint || getTimestamp(activity.onlineStart);
@@ -352,46 +314,30 @@ export default function DailyActivityPage() {
     }
   };
 
-  // ============================================================
-  // OFFLINE DURATION - TOTAL OFFLINE TIME ACCUMULATED TODAY
-  // This shows the TOTAL offline time from midnight to now
-  // ============================================================
-
   const calculateOfflineDuration = (
     activity: DailyActivity
   ): string => {
-    // Get the base offline minutes from the activity record
-    // This is the accumulated offline time saved in Firestore
     let totalOfflineMinutes = Math.max(0, activity.totalOfflineMinutes || 0);
     const now = currentTime;
 
     try {
-      // If the driver is currently offline, we need to add the time since
-      // the last checkpoint to get the TOTAL offline time today
       if (!activity.isOnline) {
-        // Get the checkpoint (when we last saved) or the offline start time
         const checkpoint = getTimestamp(activity.lastAccumulatedAt);
         const offlineStart = getTimestamp(activity.offlineStart);
-
-        // Use checkpoint if available, otherwise use offlineStart
         const start = checkpoint || offlineStart;
 
         if (start) {
           const diffMs = now.getTime() - start.getTime();
           if (diffMs > 0) {
-            // Add the additional minutes since the last checkpoint
-            // This gives us the TOTAL offline time from midnight to now
             const additionalMinutes = Math.floor(diffMs / 60000);
             totalOfflineMinutes += additionalMinutes;
           }
         }
       }
 
-      // Format the total offline minutes as hours and minutes
       const hours = Math.floor(totalOfflineMinutes / 60);
       const minutes = totalOfflineMinutes % 60;
 
-      // Return in a consistent format
       if (hours > 0) {
         return `${hours}h ${minutes}m`;
       }
@@ -402,15 +348,38 @@ export default function DailyActivityPage() {
     }
   };
 
-  // ============================================================
-  // DRIVER STATUS LISTENER WITH RETRY LOGIC & PERMANENT BACKFILL
-  // ============================================================
+  const getCurrentDuration = (
+    activity: DailyActivity
+  ): string => {
+    const now = currentTime;
 
-  /**
-   * Resolve a real status-change timestamp when the driver document provides one.
-   * The listener falls back to the moment it first observes the current state.
-   * It never invents a midnight start time.
-   */
+    if (activity.isOnline) {
+      const start = getTimestamp(activity.onlineStart);
+      if (!start) return 'N/A';
+      const diffMs = now.getTime() - start.getTime();
+      if (diffMs < 0) return 'N/A';
+      const diffMins = Math.floor(diffMs / 60000);
+      const hours = Math.floor(diffMins / 60);
+      const minutes = diffMins % 60;
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    } else {
+      const start = getTimestamp(activity.offlineStart);
+      if (!start) return 'N/A';
+      const diffMs = now.getTime() - start.getTime();
+      if (diffMs < 0) return 'N/A';
+      const diffMins = Math.floor(diffMs / 60000);
+      const hours = Math.floor(diffMins / 60);
+      const minutes = diffMins % 60;
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    }
+  };
+
   const getDriverStatusStart = (
     driverData: any,
     isOnline: boolean,
@@ -445,14 +414,11 @@ export default function DailyActivityPage() {
     return fallback;
   };
 
-  // Get the midnight timestamp for today
   const getMidnightToday = (dateStr: string): Date => {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day, 0, 0, 0, 0);
   };
 
-  // Persist the active session at least once per minute. This means the daily
-  // record keeps accumulating even if the driver never changes status again.
   const accumulateCurrentSession = (
     current: any,
     isOnline: boolean,
@@ -472,7 +438,7 @@ export default function DailyActivityPage() {
     if (!start) {
       updateData.totalMinutes = currentTotalOnline;
       updateData.totalOfflineMinutes = currentTotalOffline;
-      updateData.lastAccumulatedAt = now;
+      updateData.lastAccumulatedAt = serverTimestamp();
       return;
     }
 
@@ -487,9 +453,12 @@ export default function DailyActivityPage() {
       updateData.totalOfflineMinutes = currentTotalOffline + elapsedMinutes;
     }
 
-    updateData.lastAccumulatedAt = now;
+    updateData.lastAccumulatedAt = serverTimestamp();
   };
 
+  // ============================================================
+  // FIXED: processDriverTransaction with server timestamps
+  // ============================================================
   const processDriverTransaction = async (
     driverId: string,
     driverData: any,
@@ -498,189 +467,216 @@ export default function DailyActivityPage() {
     now: Date,
     retryCount: number = 0
   ): Promise<void> => {
+    // Prevent concurrent processing of the same driver
+    if (processingDrivers.current.has(driverId)) {
+      return;
+    }
+
+    processingDrivers.current.add(driverId);
+
     const activityDocId = `${driverId}_${todayStr}`;
     const activityRef = doc(db, 'driverDailyActivity', activityDocId);
     const driverRef = doc(db, 'drivers', driverId);
 
     try {
-      await runTransaction(db, async (transaction) => {
-        // All reads must happen before writes.
-        const activityDoc = await transaction.get(activityRef);
-        const activityData = activityDoc.exists() ? activityDoc.data() : null;
-        const driverSnapshot = await transaction.get(driverRef);
-        const latestDriverData = driverSnapshot.exists() ? driverSnapshot.data() : {};
+      // Read current state first
+      const [activityDoc, driverSnapshot] = await Promise.all([
+        getDoc(activityRef),
+        getDoc(driverRef)
+      ]);
 
-        const driverCode = getExistingDriverCode(latestDriverData) || 'PENDING';
+      const activityData = activityDoc.exists() ? activityDoc.data() : null;
+      const latestDriverData = driverSnapshot.exists() ? driverSnapshot.data() : {};
 
-        const updateData: any = {
-          driverId,
-          driverCode,
-          driverName: latestDriverData.name || driverData.name || 'Unknown',
-          numberPlate: latestDriverData.numberPlate || driverData.numberPlate || '',
-          date: todayStr,
-          isOnline,
-          status: latestDriverData.status || driverData.status || 'offline',
-          isAvailable: latestDriverData.isAvailable ?? driverData.isAvailable ?? false,
-          lastUpdated: getServerTimestamp(),
-        };
+      // If driver doesn't exist, skip
+      if (!driverSnapshot.exists()) {
+        return;
+      }
 
-        // Location data
-        for (const key of ['latitude', 'longitude', 'speed', 'heading']) {
-          if (latestDriverData[key] !== undefined && latestDriverData[key] !== null) {
-            updateData[key] = latestDriverData[key];
-          } else if (driverData[key] !== undefined && driverData[key] !== null) {
-            updateData[key] = driverData[key];
-          }
+      const driverCode = getExistingDriverCode(latestDriverData) || 'PENDING';
+
+      const updateData: any = {
+        driverId,
+        driverCode,
+        driverName: latestDriverData.name || driverData.name || 'Unknown',
+        numberPlate: latestDriverData.numberPlate || driverData.numberPlate || '',
+        date: todayStr,
+        isOnline,
+        status: latestDriverData.status || driverData.status || 'offline',
+        isAvailable: latestDriverData.isAvailable ?? driverData.isAvailable ?? false,
+        lastUpdated: serverTimestamp(),
+      };
+
+      for (const key of ['latitude', 'longitude', 'speed', 'heading']) {
+        if (latestDriverData[key] !== undefined && latestDriverData[key] !== null) {
+          updateData[key] = latestDriverData[key];
+        } else if (driverData[key] !== undefined && driverData[key] !== null) {
+          updateData[key] = driverData[key];
         }
+      }
 
-        // Fuel data
-        const fuelSource = latestDriverData.remainingFuel
-          ? latestDriverData
-          : driverData;
-        if (fuelSource.remainingFuel) updateData.remainingFuel = fuelSource.remainingFuel;
-        if (fuelSource.fuelAvailable) updateData.fuelAvailable = fuelSource.fuelAvailable;
-        if (fuelSource.hasFuel !== undefined && fuelSource.hasFuel !== null) {
-          updateData.hasFuel = fuelSource.hasFuel;
-        }
+      const fuelSource = latestDriverData.remainingFuel
+        ? latestDriverData
+        : driverData;
+      if (fuelSource.remainingFuel) updateData.remainingFuel = fuelSource.remainingFuel;
+      if (fuelSource.fuelAvailable) updateData.fuelAvailable = fuelSource.fuelAvailable;
+      if (fuelSource.hasFuel !== undefined && fuelSource.hasFuel !== null) {
+        updateData.hasFuel = fuelSource.hasFuel;
+      }
 
-        if (!activityData) {
-          // First observation of this driver for today.
-          // Get the status start time from the driver document or fallback to now
-          const statusStart = getDriverStatusStart(latestDriverData, isOnline, now, todayStr);
+      if (!activityData) {
+        // First observation of this driver for today
+        const statusStart = getDriverStatusStart(latestDriverData, isOnline, now, todayStr);
+        const midnight = getMidnightToday(todayStr);
 
-          // Calculate time from midnight to the status start time
-          const midnight = getMidnightToday(todayStr);
-
-          // If the driver has been in this status since before midnight,
-          // we need to count time from midnight to now
-          let elapsedMinutesFromMidnight = 0;
-          const startTime = statusStart < midnight ? midnight : statusStart;
-
-          // If the driver was already in this status at midnight, count from midnight
-          if (statusStart <= midnight) {
-            const diffMs = now.getTime() - midnight.getTime();
-            elapsedMinutesFromMidnight = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
-          } else {
-            // Driver came online/offline after midnight
-            const diffMs = now.getTime() - statusStart.getTime();
-            elapsedMinutesFromMidnight = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
-          }
-
-          updateData.onlineSessions = isOnline ? 1 : 0;
-          updateData.offlineSessions = isOnline ? 0 : 1;
-          updateData.totalSwitches = 0;
-          updateData.totalMinutes = 0;
-          updateData.totalOfflineMinutes = 0;
-          updateData.createdAt = getServerTimestamp();
-
-          if (isOnline) {
-            updateData.onlineStart = statusStart;
-            updateData.lastOnlineTime = statusStart;
-            updateData.offlineStart = null;
-            // Set total minutes to elapsed time from midnight or status start
-            updateData.totalMinutes = elapsedMinutesFromMidnight;
-            updateData.totalOfflineMinutes = 0;
-          } else {
-            updateData.offlineStart = statusStart;
-            updateData.lastOfflineTime = statusStart;
-            updateData.onlineStart = null;
-            // Set total offline minutes to elapsed time from midnight or status start
-            updateData.totalMinutes = 0;
-            updateData.totalOfflineMinutes = elapsedMinutesFromMidnight;
-          }
-
-          updateData.lastAccumulatedAt = now;
-          transaction.set(activityRef, updateData);
-          return;
-        }
-
-        const current = activityData;
-        const statusChanged = Boolean(current.isOnline) !== Boolean(isOnline);
-
-        if (statusChanged) {
-          if (isOnline) {
-            // OFFLINE -> ONLINE: close the offline session first.
-            const offlineStart = getTimestamp(current.offlineStart);
-            const offlineCheckpoint = getTimestamp(current.lastAccumulatedAt);
-            const offlineBase = offlineCheckpoint || offlineStart;
-            let offlineMinutes = current.totalOfflineMinutes || 0;
-
-            if (offlineBase) {
-              const diffMs = now.getTime() - offlineBase.getTime();
-              if (diffMs > 0) offlineMinutes += Math.floor(diffMs / 60000);
-            }
-
-            const statusStart = getDriverStatusStart(latestDriverData, true, now, todayStr);
-
-            updateData.totalMinutes = current.totalMinutes || 0;
-            updateData.totalOfflineMinutes = offlineMinutes;
-            updateData.onlineStart = statusStart;
-            updateData.lastOnlineTime = statusStart;
-            updateData.offlineStart = null;
-            updateData.lastAccumulatedAt = now;
-            updateData.onlineSessions = (current.onlineSessions || 0) + 1;
-            updateData.offlineSessions = current.offlineSessions || 0;
-            updateData.totalSwitches = (current.totalSwitches || 0) + 1;
-          } else {
-            // ONLINE -> OFFLINE: close the online session first.
-            const onlineStart = getTimestamp(current.onlineStart);
-            const onlineCheckpoint = getTimestamp(current.lastAccumulatedAt);
-            const onlineBase = onlineCheckpoint || onlineStart;
-            let onlineMinutes = current.totalMinutes || 0;
-
-            if (onlineBase) {
-              const diffMs = now.getTime() - onlineBase.getTime();
-              if (diffMs > 0) onlineMinutes += Math.floor(diffMs / 60000);
-            }
-
-            const statusStart = getDriverStatusStart(latestDriverData, false, now, todayStr);
-
-            updateData.totalMinutes = onlineMinutes;
-            updateData.totalOfflineMinutes = current.totalOfflineMinutes || 0;
-            updateData.offlineStart = statusStart;
-            updateData.lastOfflineTime = statusStart;
-            updateData.onlineStart = null;
-            updateData.lastAccumulatedAt = now;
-            updateData.offlineSessions = (current.offlineSessions || 0) + 1;
-            updateData.onlineSessions = current.onlineSessions || 0;
-            updateData.totalSwitches = (current.totalSwitches || 0) + 1;
-          }
+        let elapsedMinutesFromMidnight = 0;
+        
+        if (statusStart <= midnight) {
+          const diffMs = now.getTime() - midnight.getTime();
+          elapsedMinutesFromMidnight = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
         } else {
-          // Status did not change. Persist the elapsed minutes since the last
-          // checkpoint so an online driver who stays online all day is still
-          // recorded every reconciliation cycle.
-          updateData.onlineStart = current.onlineStart;
-          updateData.offlineStart = current.offlineStart;
-          updateData.lastOnlineTime = current.lastOnlineTime;
-          updateData.lastOfflineTime = current.lastOfflineTime;
-          updateData.onlineSessions = current.onlineSessions || 0;
-          updateData.offlineSessions = current.offlineSessions || 0;
-          updateData.totalSwitches = current.totalSwitches || 0;
-          accumulateCurrentSession(current, isOnline, now, updateData);
+          const diffMs = now.getTime() - statusStart.getTime();
+          elapsedMinutesFromMidnight = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
         }
 
-        Object.keys(updateData).forEach((key) => {
-          if (updateData[key] === undefined) delete updateData[key];
-        });
+        updateData.onlineSessions = isOnline ? 1 : 0;
+        updateData.offlineSessions = isOnline ? 0 : 1;
+        updateData.totalSwitches = 0;
+        updateData.totalMinutes = 0;
+        updateData.totalOfflineMinutes = 0;
+        updateData.createdAt = serverTimestamp();
 
-        transaction.set(activityRef, updateData, { merge: true });
+        if (isOnline) {
+          updateData.onlineStart = serverTimestamp();
+          updateData.lastOnlineTime = serverTimestamp();
+          updateData.offlineStart = null;
+          updateData.totalMinutes = elapsedMinutesFromMidnight;
+          updateData.totalOfflineMinutes = 0;
+        } else {
+          updateData.offlineStart = serverTimestamp();
+          updateData.lastOfflineTime = serverTimestamp();
+          updateData.onlineStart = null;
+          updateData.totalMinutes = 0;
+          updateData.totalOfflineMinutes = elapsedMinutesFromMidnight;
+        }
+
+        updateData.lastAccumulatedAt = serverTimestamp();
+        
+        // Use set with merge - no transaction needed
+        await setDoc(activityRef, updateData, { merge: true });
+        
+        if (isMountedRef.current) {
+          setLastSyncTime(new Date());
+          setLastRefreshTime(new Date());
+        }
+        return;
+      }
+
+      const current = activityData;
+      const statusChanged = Boolean(current.isOnline) !== Boolean(isOnline);
+
+      if (statusChanged) {
+        if (isOnline) {
+          // OFFLINE -> ONLINE: Close offline session
+          const offlineStart = getTimestamp(current.offlineStart);
+          const offlineCheckpoint = getTimestamp(current.lastAccumulatedAt);
+          const offlineBase = offlineCheckpoint || offlineStart;
+          let offlineMinutes = current.totalOfflineMinutes || 0;
+
+          if (offlineBase) {
+            const diffMs = now.getTime() - offlineBase.getTime();
+            if (diffMs > 0) offlineMinutes += Math.floor(diffMs / 60000);
+          }
+
+          updateData.totalMinutes = current.totalMinutes || 0;
+          updateData.totalOfflineMinutes = offlineMinutes;
+          updateData.onlineStart = serverTimestamp();
+          updateData.lastOnlineTime = serverTimestamp();
+          updateData.offlineStart = null;
+          updateData.lastAccumulatedAt = serverTimestamp();
+          updateData.onlineSessions = (current.onlineSessions || 0) + 1;
+          updateData.offlineSessions = current.offlineSessions || 0;
+          updateData.totalSwitches = (current.totalSwitches || 0) + 1;
+        } else {
+          // ONLINE -> OFFLINE: Close online session
+          const onlineStart = getTimestamp(current.onlineStart);
+          const onlineCheckpoint = getTimestamp(current.lastAccumulatedAt);
+          const onlineBase = onlineCheckpoint || onlineStart;
+          let onlineMinutes = current.totalMinutes || 0;
+
+          if (onlineBase) {
+            const diffMs = now.getTime() - onlineBase.getTime();
+            if (diffMs > 0) onlineMinutes += Math.floor(diffMs / 60000);
+          }
+
+          updateData.totalMinutes = onlineMinutes;
+          updateData.totalOfflineMinutes = current.totalOfflineMinutes || 0;
+          updateData.offlineStart = serverTimestamp();
+          updateData.lastOfflineTime = serverTimestamp();
+          updateData.onlineStart = null;
+          updateData.lastAccumulatedAt = serverTimestamp();
+          updateData.offlineSessions = (current.offlineSessions || 0) + 1;
+          updateData.onlineSessions = current.onlineSessions || 0;
+          updateData.totalSwitches = (current.totalSwitches || 0) + 1;
+        }
+      } else {
+        // Status unchanged - just accumulate minutes since last checkpoint
+        updateData.onlineStart = current.onlineStart;
+        updateData.offlineStart = current.offlineStart;
+        updateData.lastOnlineTime = current.lastOnlineTime;
+        updateData.lastOfflineTime = current.lastOfflineTime;
+        updateData.onlineSessions = current.onlineSessions || 0;
+        updateData.offlineSessions = current.offlineSessions || 0;
+        updateData.totalSwitches = current.totalSwitches || 0;
+        
+        // Accumulate current session minutes
+        const checkpoint = getTimestamp(current.lastAccumulatedAt);
+        const fallbackStart = isOnline
+          ? getTimestamp(current.onlineStart)
+          : getTimestamp(current.offlineStart);
+        const start = checkpoint || fallbackStart;
+
+        let totalOnline = current.totalMinutes || 0;
+        let totalOffline = current.totalOfflineMinutes || 0;
+
+        if (start) {
+          const diffMs = now.getTime() - start.getTime();
+          const elapsedMinutes = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
+
+          if (isOnline) {
+            totalOnline += elapsedMinutes;
+          } else {
+            totalOffline += elapsedMinutes;
+          }
+        }
+
+        updateData.totalMinutes = totalOnline;
+        updateData.totalOfflineMinutes = totalOffline;
+        updateData.lastAccumulatedAt = serverTimestamp();
+      }
+
+      // Remove undefined values
+      Object.keys(updateData).forEach((key) => {
+        if (updateData[key] === undefined) delete updateData[key];
       });
+
+      // Use set with merge - no transaction needed
+      await setDoc(activityRef, updateData, { merge: true });
 
       if (isMountedRef.current) {
         setLastSyncTime(new Date());
         setLastRefreshTime(new Date());
       }
     } catch (error: any) {
-      if (error.code === 'failed-precondition' && retryCount < 3) {
-        await new Promise(resolve => setTimeout(resolve, 200 * (retryCount + 1)));
-        return processDriverTransaction(driverId, driverData, isOnline, todayStr, now, retryCount + 1);
-      }
-
+      // Only log actual errors (not conflicts since we're not using transactions anymore)
       if (error.code === 'unavailable' && isMountedRef.current) {
-        console.warn('Firestore connection dropped. Listeners will retry through Firestore.');
+        console.warn('Firestore connection dropped. Will retry on next cycle.');
+        return;
       }
 
-      console.error('Error in transaction for driver:', driverId, error);
+      console.error('Error updating driver activity for:', driverId, error);
+    } finally {
+      processingDrivers.current.delete(driverId);
     }
   };
 
@@ -699,27 +695,39 @@ export default function DailyActivityPage() {
       const todayStr = now.toISOString().split('T')[0];
       if (selectedDate !== todayStr) return;
 
-      // Check every driver, not only changed drivers. The first snapshot also
-      // creates today's record for every driver in the database.
-      for (const driverDoc of snapshot.docs) {
-        if (!isMountedRef.current) return;
+      const driverDocs = snapshot.docs;
+      const concurrencyLimit = 3;
+      const driversToProcess = driverDocs.filter((doc: any) => {
+        const driverData = doc.data();
+        return driverData.name && !processingDrivers.current.has(doc.id);
+      });
+      
+      for (let i = 0; i < driversToProcess.length; i += concurrencyLimit) {
+        const batch = driversToProcess.slice(i, i + concurrencyLimit);
+        await Promise.allSettled(
+          batch.map(async (driverDoc: any) => {
+            if (!isMountedRef.current) return;
 
-        const driverData = driverDoc.data();
-        const driverId = driverDoc.id;
-        if (!driverData.name) continue;
+            const driverData = driverDoc.data();
+            const driverId = driverDoc.id;
+            if (!driverData.name) return;
 
-        const isOnline = Boolean(driverData.isOnline ?? false);
+            const isOnline = Boolean(driverData.isOnline ?? false);
 
-        ensureDriverCode(driverId, driverData).catch((error) => {
-          console.error('Error ensuring driver code:', error);
-        });
+            try {
+              await ensureDriverCode(driverId, driverData);
+            } catch (error) {
+              console.error('Error ensuring driver code:', error);
+            }
 
-        await processDriverTransaction(
-          driverId,
-          driverData,
-          isOnline,
-          todayStr,
-          now
+            await processDriverTransaction(
+              driverId,
+              driverData,
+              isOnline,
+              todayStr,
+              now
+            );
+          })
         );
       }
     };
@@ -727,9 +735,6 @@ export default function DailyActivityPage() {
     driverUnsubscribeRef.current = onSnapshot(
       driversQuery,
       async (snapshot) => {
-        // Every Firestore snapshot is a full driver-state reconciliation.
-        // This means an existing online driver is checked even if they have
-        // not changed status since the previous snapshot.
         await processAllDrivers(snapshot);
       },
       (error) => {
@@ -737,8 +742,6 @@ export default function DailyActivityPage() {
       }
     );
 
-    // Reconcile every driver once per minute. This persists the active session
-    // even when the driver remains online/offline without changing status.
     const intervalId = window.setInterval(async () => {
       try {
         if (!isMountedRef.current || selectedDate !== new Date().toISOString().split('T')[0]) return;
@@ -747,7 +750,7 @@ export default function DailyActivityPage() {
       } catch (error) {
         console.error('Error during daily driver reconciliation:', error);
       }
-    }, 60000);
+    }, 120000);
 
     const originalUnsubscribe = driverUnsubscribeRef.current;
     driverUnsubscribeRef.current = () => {
@@ -755,10 +758,6 @@ export default function DailyActivityPage() {
       window.clearInterval(intervalId);
     };
   };
-
-  // ============================================================
-  // DAILY ACTIVITY LISTENER
-  // ============================================================
 
   const setupListener = () => {
     if (unsubscribeRef.current) {
@@ -778,7 +777,6 @@ export default function DailyActivityPage() {
       async (snapshot) => {
         if (!isMountedRef.current) return;
 
-        // Get valid Firebase driver IDs
         let validDriverIds = new Set<string>();
 
         try {
@@ -808,7 +806,6 @@ export default function DailyActivityPage() {
           };
         }) as DailyActivity[];
 
-        // Filter out activities for drivers that no longer exist
         let filteredActivitiesData = activitiesData;
 
         if (validDriverIds.size > 0) {
@@ -860,10 +857,6 @@ export default function DailyActivityPage() {
     );
   };
 
-  // ============================================================
-  // BOTH LISTENERS
-  // ============================================================
-
   useEffect(() => {
     isMountedRef.current = true;
     setupListener();
@@ -893,10 +886,6 @@ export default function DailyActivityPage() {
       return copy;
     });
   }, [sortBy]);
-
-  // ============================================================
-  // REFRESH
-  // ============================================================
 
   const refreshData = async () => {
     if (refreshing) return;
@@ -983,10 +972,6 @@ export default function DailyActivityPage() {
     }
   };
 
-  // ============================================================
-  // DATE RANGE
-  // ============================================================
-
   const getDateRange = () => {
     const dates: string[] = [];
     for (let i = 0; i < 7; i++) {
@@ -996,10 +981,6 @@ export default function DailyActivityPage() {
     }
     return dates;
   };
-
-  // ============================================================
-  // FORMAT TIME
-  // ============================================================
 
   const formatTime = (timestamp: any): string => {
     if (!timestamp) return 'N/A';
@@ -1012,10 +993,6 @@ export default function DailyActivityPage() {
     }
   };
 
-  // ============================================================
-  // FORMAT DATE
-  // ============================================================
-
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr + 'T00:00:00');
     return date.toLocaleDateString('en-US', {
@@ -1025,10 +1002,6 @@ export default function DailyActivityPage() {
       year: 'numeric',
     });
   };
-
-  // ============================================================
-  // DURATION
-  // ============================================================
 
   const calculateDuration = (
     startTime: any,
@@ -1052,28 +1025,20 @@ export default function DailyActivityPage() {
     }
   };
 
-  // ============================================================
-  // STATUS BADGE
-  // ============================================================
-
   const getStatusBadge = (isOnline: boolean) => {
     if (isOnline) {
       return (
-        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 animate-pulse">
+        <span className="px-3 py-1.5 text-sm font-semibold rounded-full bg-green-100 text-green-800 animate-pulse">
           🟢 Online
         </span>
       );
     }
     return (
-      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+      <span className="px-3 py-1.5 text-sm font-semibold rounded-full bg-red-100 text-red-800">
         🔴 Offline
       </span>
     );
   };
-
-  // ============================================================
-  // TOTAL HOURS
-  // ============================================================
 
   const calculateTotalHoursForDisplay = (
     activity: DailyActivity
@@ -1081,10 +1046,6 @@ export default function DailyActivityPage() {
     const { hours, minutes } = calculateDriverHours(activity);
     return `${hours}h ${minutes}m`;
   };
-
-  // ============================================================
-  // STATUS DETAILS - FIXED TO SHOW TOTAL TIME FROM MIDNIGHT
-  // ============================================================
 
   const getStatusDetails = (
     activity: DailyActivity
@@ -1096,10 +1057,8 @@ export default function DailyActivityPage() {
     const now = currentTime;
 
     if (activity.isOnline) {
-      // Calculate TOTAL online time from midnight to now
       let totalOnlineMinutes = Math.max(0, activity.totalMinutes || 0);
 
-      // Add current session time if online
       const checkpoint = getTimestamp(activity.lastAccumulatedAt);
       const start = checkpoint || getTimestamp(activity.onlineStart);
       if (start) {
@@ -1121,10 +1080,8 @@ export default function DailyActivityPage() {
     }
 
     if (!activity.isOnline) {
-      // Calculate TOTAL offline time from midnight to now
       let totalOfflineMinutes = Math.max(0, activity.totalOfflineMinutes || 0);
 
-      // Add current session time if offline
       const checkpoint = getTimestamp(activity.lastAccumulatedAt);
       const start = checkpoint || getTimestamp(activity.offlineStart);
       if (start) {
@@ -1152,15 +1109,10 @@ export default function DailyActivityPage() {
     };
   };
 
-  // ============================================================
-  // ENHANCED: GET FULL TIMELINE FOR TOOLTIP
-  // ============================================================
-
   const getFullTimeline = (activity: DailyActivity): string[] => {
     const now = currentTime;
     const timelineItems: string[] = [];
 
-    // Combine all history
     const allHistory = [
       ...(activity.onlineHistory || []).map(h => ({ ...h, status: 'online' })),
       ...(activity.offlineHistory || []).map(h => ({ ...h, status: 'offline' }))
@@ -1170,7 +1122,6 @@ export default function DailyActivityPage() {
       return aTime - bTime;
     });
 
-    // If no history, show current status
     if (allHistory.length === 0) {
       if (activity.isOnline && activity.onlineStart) {
         const start = getTimestamp(activity.onlineStart);
@@ -1196,7 +1147,6 @@ export default function DailyActivityPage() {
       return timelineItems;
     }
 
-    // Build timeline from history
     allHistory.forEach((entry, index) => {
       const timestamp = getTimestamp(entry.timestamp);
       if (!timestamp) return;
@@ -1205,7 +1155,6 @@ export default function DailyActivityPage() {
       const statusEmoji = entry.status === 'online' ? '🟢' : '⚪';
       const statusText = entry.status === 'online' ? 'Online' : 'Offline';
 
-      // Calculate duration until next event or now
       let duration = '';
       if (index < allHistory.length - 1) {
         const nextTime = getTimestamp(allHistory[index + 1].timestamp);
@@ -1219,7 +1168,6 @@ export default function DailyActivityPage() {
           }
         }
       } else {
-        // Last event - calculate duration to now if it's the current status
         if ((entry.status === 'online' && activity.isOnline) ||
           (entry.status === 'offline' && !activity.isOnline)) {
           const diffMs = now.getTime() - timestamp.getTime();
@@ -1238,65 +1186,59 @@ export default function DailyActivityPage() {
     return timelineItems;
   };
 
-  // ============================================================
-  // ENHANCED: RENDER TIMES WITH TOOLTIP
-  // ============================================================
-
   const renderTimesWithTooltip = (activity: DailyActivity) => {
     const timeline = getFullTimeline(activity);
     const hasTimeline = timeline.length > 0;
 
     return (
       <div className="relative group">
-        {/* Main display - simple view */}
         <div className="flex flex-col space-y-1">
           {activity.isOnline ? (
             <>
-              <span className="text-xs text-green-600 font-medium">
+              <span className="text-sm text-green-600 font-medium">
                 Online since: {formatTime(activity.onlineStart)}
               </span>
               {activity.offlineStart && (
-                <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
+                <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
                   Last offline: {formatTime(activity.offlineStart)}
                 </span>
               )}
             </>
           ) : (
             <>
-              <span className="text-xs text-red-600 font-medium">
+              <span className="text-sm text-red-600 font-medium">
                 Offline since: {formatTime(activity.offlineStart)}
               </span>
               {activity.onlineStart && (
-                <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
+                <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
                   Last online: {formatTime(activity.onlineStart)}
                 </span>
               )}
             </>
           )}
           {!activity.onlineStart && !activity.offlineStart && (
-            <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               No activity recorded
             </span>
           )}
         </div>
 
-        {/* Tooltip - shows full timeline on hover */}
         {hasTimeline && (
           <div className={`absolute left-0 top-full mt-1 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 min-w-[200px] max-w-xs rounded-lg shadow-xl border p-3 ${userBackground === 'dark'
               ? 'bg-gray-800 border-gray-600 text-white'
               : 'bg-white border-gray-200 text-gray-900'
             }`}>
-            <div className={`text-xs font-medium mb-2 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <div className={`text-sm font-medium mb-2 ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               📋 Full Day Timeline
             </div>
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {timeline.map((item, idx) => (
-                <div key={idx} className={`text-xs ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'} py-0.5 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} last:border-0`}>
+                <div key={idx} className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'} py-0.5 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} last:border-0`}>
                   {item}
                 </div>
               ))}
             </div>
-            <div className={`text-[10px] ${userBackground === 'dark' ? 'text-gray-500' : 'text-gray-400'} mt-1 text-center border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} pt-1`}>
+            <div className={`text-xs ${userBackground === 'dark' ? 'text-gray-500' : 'text-gray-400'} mt-1 text-center border-t ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'} pt-1`}>
               Hover to see full timeline
             </div>
           </div>
@@ -1305,10 +1247,6 @@ export default function DailyActivityPage() {
     );
   };
 
-  // ============================================================
-  // SEARCH
-  // ============================================================
-
   const filteredActivities = activities.filter(
     (activity) =>
       activity.driverName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1316,10 +1254,6 @@ export default function DailyActivityPage() {
       activity.driverId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.numberPlate?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  // ============================================================
-  // STATISTICS
-  // ============================================================
 
   const totalDrivers = filteredActivities.length;
   const onlineDrivers = filteredActivities.filter((a) => a.isOnline).length;
@@ -1337,25 +1271,21 @@ export default function DailyActivityPage() {
   const avgHours = Math.floor(averageMinutes / 60);
   const avgMinutes = averageMinutes % 60;
 
-  // ============================================================
-  // INDEX ERROR
-  // ============================================================
-
   if (indexError) {
     return (
       <div className={`space-y-6 ${getBackgroundClass()}`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            <h1 className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Daily Driver Activity
             </h1>
-            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               View daily performance and activity of all drivers
             </p>
           </div>
           <Link
             href="/dashboard"
-            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-base font-medium transition"
           >
             Back to Dashboard
           </Link>
@@ -1364,19 +1294,19 @@ export default function DailyActivityPage() {
           <div className="flex items-start gap-4">
             <div className="text-2xl">⚠️</div>
             <div>
-              <h3 className="text-lg font-semibold text-yellow-800">Index Required</h3>
-              <p className="text-yellow-700 mt-1">
+              <h3 className="text-xl font-semibold text-yellow-800">Index Required</h3>
+              <p className="text-base text-yellow-700 mt-1">
                 Firestore needs an index to query driver activities. Click the button below to create it.
               </p>
               <a
                 href={indexError}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block mt-4 px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition"
+                className="inline-block mt-4 px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition text-base"
               >
                 Create Index in Firebase Console
               </a>
-              <p className="text-sm text-yellow-600 mt-3">
+              <p className="text-base text-yellow-600 mt-3">
                 After creating the index, wait a few minutes for it to build, then refresh this page.
               </p>
             </div>
@@ -1386,10 +1316,6 @@ export default function DailyActivityPage() {
     );
   }
 
-  // ============================================================
-  // LOADING
-  // ============================================================
-
   if (loading) {
     return (
       <div className={`flex items-center justify-center min-h-[60vh] ${getBackgroundClass()}`}>
@@ -1398,37 +1324,33 @@ export default function DailyActivityPage() {
     );
   }
 
-  // ============================================================
-  // MAIN UI
-  // ============================================================
-
   return (
     <div className={`p-4 md:p-6 transition-colors duration-300 ${getBackgroundClass()}`}>
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full max-w-full mx-auto space-y-6">
         {/* HEADER */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            <h1 className={`text-3xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Daily Driver Activity
             </h1>
-            <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               View daily performance and activity of all drivers
             </p>
-            <div className="flex items-center gap-3 mt-1">
-              <p className={`text-xs ${userBackground === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+            <div className="flex flex-wrap items-center gap-3 mt-1">
+              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
                 Last refreshed: {lastRefreshTime.toLocaleTimeString()}
               </p>
-              <span className="text-xs text-green-500">
+              <span className="text-sm text-green-500">
                 🟢 Last Sync: {lastSyncTime.toLocaleTimeString()}
               </span>
-              <span className="text-xs text-blue-500 animate-pulse">🔄 Real-time</span>
+              <span className="text-sm text-blue-500 animate-pulse">🔄 Real-time</span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={refreshData}
               disabled={refreshing}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${refreshing
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-base font-medium transition ${refreshing
                   ? 'bg-gray-400 cursor-not-allowed text-white'
                   : 'bg-blue-500 hover:bg-blue-600 text-white'
                 }`}
@@ -1437,412 +1359,409 @@ export default function DailyActivityPage() {
                 <>
                   <svg
                     className="animate-spin h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Refreshing...
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  Refresh Data
-                </>
-              )}
-            </button>
-            <Link
-              href="/dashboard"
-              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-            >
-              Back to Dashboard
-            </Link>
-          </div>
-        </div>
-
-        {/* REAL-TIME STATUS */}
-        <div
-          className={`rounded-xl p-3 flex items-center justify-between ${userBackground === 'dark'
-              ? 'bg-blue-900/30 border border-blue-700 text-blue-200'
-              : 'bg-blue-50 border border-blue-200 text-blue-700'
-            }`}
-        >
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'
-                }`}
-            />
-            <span className={`text-sm ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
-              {refreshing ? '🔄 Refreshing data...' : '✅ Live updates: Driver status auto-syncs from database'}
-            </span>
-          </div>
-          <span className={`text-xs ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-600'}`}>
-            {onlineDrivers} online • {offlineDrivers} offline
-          </span>
-        </div>
-
-        {/* FILTERS AND STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="rounded-xl shadow-sm p-4 border bg-cyan-300 border-blue-200">
-            <p className="text-sm text-gray-800">Date</p>
-            <select
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-400 border-gray-300"
-            >
-              {getDateRange().map((date) => (
-                <option key={date} value={date}>
-                  {formatDate(date)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="rounded-xl shadow-sm p-4 border bg-green-50 border-green-200">
-            <p className="text-sm text-gray-800">Total Drivers</p>
-            <p className="text-2xl font-bold text-gray-900">{totalDrivers}</p>
-          </div>
-          <div className="rounded-xl shadow-sm p-4 border bg-green-100 border-green-300">
-            <p className="text-sm text-gray-800">Online Now</p>
-            <p className="text-2xl font-bold text-green-600">{onlineDrivers}</p>
-          </div>
-          <div className="rounded-xl shadow-sm p-4 border bg-red-200 border-red-200">
-            <p className="text-sm text-gray-800">Offline Now</p>
-            <p className="text-2xl font-bold text-red-600">{offlineDrivers}</p>
-          </div>
-          <div className="rounded-xl shadow-sm p-4 border bg-blue-300 border-blue-200">
-            <p className="text-sm text-gray-800">Average Working Time</p>
-            <p className="text-2xl font-bold text-blue-600">
-              {avgHours}h {avgMinutes}m
-            </p>
-          </div>
-        </div>
-
-        {/* SEARCH AND SORT */}
-        <div className="rounded-xl shadow-sm p-4 border bg-gray-50 border-gray-200">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <input
-              type="text"
-              placeholder="Search by driver name, ID or plate number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-300 text-gray-900 border-gray-300"
-            />
-            <select
-              value={sortBy}
-              onChange={(e) =>
-                setSortBy(e.target.value as 'hours' | 'name' | 'offline')
-              }
-              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-400 border-gray-300"
-            >
-              <option value="hours">Sort by Hours Worked</option>
-              <option value="offline">Sort by Offline Hours</option>
-              <option value="name">Sort by Name</option>
-            </select>
-          </div>
-        </div>
-
-        {/* ACTIVITY TABLE */}
-        <div
-          className={`rounded-xl shadow-sm border overflow-hidden ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
-            } ${getCardClass()}`}
-        >
-          <div
-            className={`p-6 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'
-              } flex justify-between items-center`}
-          >
-            <h2 className={`text-lg font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Driver Activity - {formatDate(selectedDate)}
-            </h2>
-            <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-              {filteredActivities.length} drivers
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-red-900">
-                <tr>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Driver
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Driver ID
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Plate Number
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Status
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Current Duration
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Offline Duration
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Sessions
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Times
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Total Hours
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Efficiency
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>
-                    Last Updated
-                  </th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${userBackground === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {filteredActivities.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={11}
-                      className={`px-6 py-8 text-center ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
-                    >
-                      No activity records found for this date
-                    </td>
-                  </tr>
-                ) : (
-                  filteredActivities.map((activity) => {
-                    const statusInfo = getStatusDetails(activity);
-                    const offlineDuration = calculateOfflineDuration(activity);
-
-                    // ============================================================
-                    // EFFICIENCY - Based on total online time vs target 8 hours
-                    // ============================================================
-                    const { hours: efficiencyHours, minutes: efficiencyMinutes } =
-                      calculateDriverHours(activity);
-
-                    const efficiencyTotalMinutes =
-                      efficiencyHours * 60 + efficiencyMinutes;
-
-                    const TARGET_MINUTES = 480; // 8 hours
-
-                    let efficiency = 0;
-
-                    if (efficiencyTotalMinutes <= 0) {
-                      efficiency = 0;
-                    } else if (efficiencyTotalMinutes >= TARGET_MINUTES) {
-                      efficiency = 100;
-                    } else {
-                      efficiency = (efficiencyTotalMinutes / TARGET_MINUTES) * 100;
-                    }
-
-                    efficiency = Math.min(100, Math.max(0, efficiency));
-
-                    const onlineSessions = activity.onlineSessions || 0;
-                    const offlineSessions = activity.offlineSessions || 0;
-                    const totalSwitches = activity.totalSwitches || 0;
-                    const totalHoursDisplay = calculateTotalHoursForDisplay(activity);
-
-                    const displayDriverId =
-                      activity.driverCode && activity.driverCode !== 'PENDING'
-                        ? activity.driverCode
-                        : 'Assigning...';
-
-                    return (
-                      <tr
-                        key={activity.id}
-                        className={userBackground === 'dark' ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50'}
-                      >
-                        {/* DRIVER */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="relative">
-                              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-semibold text-sm">
-                                {activity.driverName?.charAt(0) || '?'}
-                              </div>
-                              {activity.isOnline && (
-                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
-                              )}
-                              {!activity.isOnline && (
-                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>
-                              )}
-                            </div>
-                            <div className="ml-3">
-                              <div className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                                {activity.driverName || 'Unknown'}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* PUBLIC DRIVER ID */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-mono font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {displayDriverId}
-                          </span>
-                        </td>
-
-                        {/* PLATE */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {activity.numberPlate || 'N/A'}
-                          </span>
-                        </td>
-
-                        {/* STATUS */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(activity.isOnline)}
-                        </td>
-
-                        {/* CURRENT DURATION - NOW SHOWS TOTAL TIME FROM MIDNIGHT */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`text-sm font-semibold ${activity.isOnline ? 'text-green-600' : 'text-red-600'}`}>
-                            {statusInfo.duration}
-                          </span>
-                        </td>
-
-                        {/* OFFLINE DURATION - Shows TOTAL offline time today */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-semibold text-red-600">
-                            {offlineDuration}
-                          </span>
-                        </td>
-
-                        {/* SESSIONS */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-col space-y-1">
-                            <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-                              Online: {onlineSessions}
-                            </span>
-                            <span className={`text-xs ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-                              Offline: {offlineSessions}
-                            </span>
-                            <span className="text-xs text-gray-400">Switches: {totalSwitches}</span>
-                          </div>
-                        </td>
-
-                        {/* TIMES - ENHANCED WITH TOOLTIP */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {renderTimesWithTooltip(activity)}
-                        </td>
-
-                        {/* TOTAL HOURS */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-lg font-bold text-green-700">
-                            {totalHoursDisplay}
-                          </span>
-                        </td>
-
-                        {/* EFFICIENCY */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-blue-500 rounded-full h-2"
-                                style={{ width: `${Math.min(efficiency, 100)}%` }}
-                              ></div>
-                            </div>
-                            <span className={`text-sm font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-700'}`}>
-                              {efficiency.toFixed(0)}%
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* LAST UPDATED */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {activity.lastUpdated ? formatTime(activity.lastUpdated) : 'N/A'}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* SUMMARY FOOTER */}
-        <div
-          className={`rounded-xl shadow-sm p-4 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'
-            } ${getCardClass()}`}
-        >
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 bg-cyan-700 text-center">
-            <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
-                Total Hours Worked
-              </p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
-                {totalHoursWorked}h {remainingMinutesWorked}m
-              </p>
-            </div>
-            <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
-                Online Drivers
-              </p>
-              <p className="text-xl font-bold text-green-600">{onlineDrivers}</p>
-            </div>
-            <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
-                Offline Drivers
-              </p>
-              <p className="text-xl font-bold text-red-600">{offlineDrivers}</p>
-            </div>
-            <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
-                Average Working Time
-              </p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
-                {avgHours}h {avgMinutes}m
-              </p>
-            </div>
-            <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
-                Total Sessions
-              </p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
-                {filteredActivities.reduce((sum, a) => {
-                  const online = a.onlineSessions || 0;
-                  const offline = a.offlineSessions || 0;
-                  // If no sessions recorded but driver exists, count as 1 (current status)
-                  if (online === 0 && offline === 0 && a.driverId) {
-                    return sum + 1;
-                  }
-                  return sum + online + offline;
-                }, 0)}
-              </p>
-            </div>
-            <div>
-              <p className={`text-sm ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>
-                Last Sync
-              </p>
-              <p className={`text-xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>
-                {lastSyncTime.toLocaleTimeString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+                    xmlns="http://www.w3.org/2000/svg"  
+                    fill="none"  
+                    viewBox="0 0 24 24"  
+                  >  
+                    <circle  
+                      className="opacity-25"  
+                      cx="12"  
+                      cy="12"  
+                      r="10"  
+                      stroke="currentColor"  
+                      strokeWidth="4"  
+                    />  
+                    <path  
+                      className="opacity-75"  
+                      fill="currentColor"  
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"  
+                    />  
+                  </svg>  
+                  Refreshing...  
+                </>  
+              ) : (  
+                <>  
+                  <svg  
+                    className="w-4 h-4"  
+                    fill="none"  
+                    stroke="currentColor"  
+                    viewBox="0 0 24 24"  
+                  >  
+                    <path  
+                      strokeLinecap="round"  
+                      strokeLinejoin="round"  
+                      strokeWidth="2"  
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"  
+                    />  
+                  </svg>  
+                  Refresh Data  
+                </>  
+              )}  
+            </button>  
+            <Link  
+              href="/dashboard"  
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-base font-medium transition"  
+            >  
+              Back to Dashboard  
+            </Link>  
+          </div>  
+        </div>  
+   
+        {/* REAL-TIME STATUS */}  
+        <div  
+          className={`rounded-xl p-3 flex flex-wrap items-center justify-between ${userBackground === 'dark'  
+              ? 'bg-blue-900/30 border border-blue-700 text-blue-200'  
+              : 'bg-blue-50 border border-blue-200 text-blue-700'  
+            }`}  
+        >  
+          <div className="flex flex-wrap items-center gap-2">  
+            <div  
+              className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'  
+                }`}  
+            />  
+            <span className={`text-base ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>  
+              {refreshing ? '🔄 Refreshing data...' : '✅ Live updates: Driver status auto-syncs from database'}  
+            </span>  
+          </div>  
+          <span className={`text-sm ${userBackground === 'dark' ? 'text-blue-300' : 'text-blue-600'}`}>  
+            {onlineDrivers} online • {offlineDrivers} offline  
+          </span>  
+        </div>  
+   
+        {/* FILTERS AND STATS */}  
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 w-full">  
+          <div className="rounded-xl shadow-sm p-4 border bg-cyan-300 border-blue-200">  
+            <p className="text-base text-gray-800">Date</p>  
+            <select  
+              value={selectedDate}  
+              onChange={(e) => setSelectedDate(e.target.value)}  
+              className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-400 border-gray-300 text-base"  
+            >  
+              {getDateRange().map((date) => (  
+                <option key={date} value={date}>  
+                  {formatDate(date)}  
+                </option>  
+              ))}  
+            </select>  
+          </div>  
+          <div className="rounded-xl shadow-sm p-4 border bg-green-50 border-green-200">  
+            <p className="text-base text-gray-800">Total Drivers</p>  
+            <p className="text-3xl font-bold text-gray-900">{totalDrivers}</p>  
+          </div>  
+          <div className="rounded-xl shadow-sm p-4 border bg-green-100 border-green-300">  
+            <p className="text-base text-gray-800">Online Now</p>  
+            <p className="text-3xl font-bold text-green-600">{onlineDrivers}</p>  
+          </div>  
+          <div className="rounded-xl shadow-sm p-4 border bg-red-200 border-red-200">  
+            <p className="text-base text-gray-800">Offline Now</p>  
+            <p className="text-3xl font-bold text-red-600">{offlineDrivers}</p>  
+          </div>  
+          <div className="rounded-xl shadow-sm p-4 border bg-blue-300 border-blue-200">  
+            <p className="text-base text-gray-800">Average Working Time</p>  
+            <p className="text-3xl font-bold text-blue-600">  
+              {avgHours}h {avgMinutes}m  
+            </p>  
+          </div>  
+        </div>  
+   
+        {/* SEARCH AND SORT */}  
+        <div className="rounded-xl shadow-sm p-4 border bg-gray-50 border-gray-200 w-full">  
+          <div className="flex flex-col sm:flex-row gap-4">  
+            <input  
+              type="text"  
+              placeholder="Search by driver name, ID or plate number..."  
+              value={searchTerm}  
+              onChange={(e) => setSearchTerm(e.target.value)}  
+              className="flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-300 text-gray-900 border-gray-300 text-base"  
+            />  
+            <select  
+              value={sortBy}  
+              onChange={(e) =>  
+                setSortBy(e.target.value as 'hours' | 'name' | 'offline')  
+              }  
+              className="px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-400 border-gray-300 text-base"  
+            >  
+              <option value="hours">Sort by Hours Worked</option>  
+              <option value="offline">Sort by Offline Hours</option>  
+              <option value="name">Sort by Name</option>  
+            </select>  
+          </div>  
+        </div>  
+   
+        {/* ACTIVITY TABLE */}  
+        <div  
+          className={`rounded-xl shadow-sm border overflow-hidden ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'  
+            } ${getCardClass()} w-full`}  
+        >  
+          <div  
+            className={`p-6 border-b ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-200'  
+              } flex flex-wrap justify-between items-center gap-4`}  
+          >  
+            <h2 className={`text-xl font-semibold ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>  
+              Driver Activity - {formatDate(selectedDate)}  
+            </h2>  
+            <span className={`text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>  
+              {filteredActivities.length} drivers  
+            </span>  
+          </div>  
+          <div className="overflow-x-auto w-full">  
+            <table className="w-full min-w-[1000px]">  
+              <thead className="bg-red-900">  
+                <tr>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Driver  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Driver ID  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Plate Number  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Status  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Current Duration  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Offline Duration  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Sessions  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Times  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Total Hours  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Efficiency  
+                  </th>  
+                  <th className={`px-6 py-4 text-left text-sm font-medium uppercase tracking-wider ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-200'}`}>  
+                    Last Updated  
+                  </th>  
+                </tr>  
+              </thead>  
+              <tbody className={`divide-y ${userBackground === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>  
+                {filteredActivities.length === 0 ? (  
+                  <tr>  
+                    <td  
+                      colSpan={11}  
+                      className={`px-6 py-8 text-center text-base ${userBackground === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}  
+                    >  
+                      No activity records found for this date  
+                    </td>  
+                  </tr>  
+                ) : (  
+                  filteredActivities.map((activity) => {  
+                    const statusInfo = getStatusDetails(activity);  
+                    const offlineDuration = calculateOfflineDuration(activity);  
+                    const currentDuration = getCurrentDuration(activity); 
+ 
+                    const { hours: efficiencyHours, minutes: efficiencyMinutes } =  
+                      calculateDriverHours(activity);  
+   
+                    const efficiencyTotalMinutes =  
+                      efficiencyHours * 60 + efficiencyMinutes;  
+   
+                    const TARGET_MINUTES = 480;  
+   
+                    let efficiency = 0;  
+   
+                    if (efficiencyTotalMinutes <= 0) {  
+                      efficiency = 0;  
+                    } else if (efficiencyTotalMinutes >= TARGET_MINUTES) {  
+                      efficiency = 100;  
+                    } else {  
+                      efficiency = (efficiencyTotalMinutes / TARGET_MINUTES) * 100;  
+                    }  
+   
+                    efficiency = Math.min(100, Math.max(0, efficiency));  
+   
+                    const onlineSessions = activity.onlineSessions || 0;  
+                    const offlineSessions = activity.offlineSessions || 0;  
+                    const totalSwitches = activity.totalSwitches || 0;  
+                    const totalHoursDisplay = calculateTotalHoursForDisplay(activity);  
+   
+                    const displayDriverId =  
+                      activity.driverCode && activity.driverCode !== 'PENDING'  
+                        ? activity.driverCode  
+                        : 'Assigning...';  
+   
+                    return (  
+                      <tr  
+                        key={activity.id}  
+                        className={userBackground === 'dark' ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50'}  
+                      >  
+                        {/* DRIVER */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <div className="flex items-center">  
+                            <div className="relative">  
+                              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-semibold text-base">  
+                                {activity.driverName?.charAt(0) || '?'}  
+                              </div>  
+                              {activity.isOnline && (  
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>  
+                              )}  
+                              {!activity.isOnline && (  
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>  
+                              )}  
+                            </div>  
+                            <div className="ml-3">  
+                              <div className={`text-base font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-900'}`}>  
+                                {activity.driverName || 'Unknown'}  
+                              </div>  
+                            </div>  
+                          </div>  
+                        </td>  
+   
+                        {/* PUBLIC DRIVER ID */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <span className="text-base font-mono font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">  
+                            {displayDriverId}  
+                          </span>  
+                        </td>  
+   
+                        {/* PLATE */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <span className={`text-base font-medium ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>  
+                            {activity.numberPlate || 'N/A'}  
+                          </span>  
+                        </td>  
+   
+                        {/* STATUS */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          {getStatusBadge(activity.isOnline)}  
+                        </td>  
+   
+                        {/* CURRENT DURATION */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <span className={`text-base font-semibold ${activity.isOnline ? 'text-green-600' : 'text-red-600'}`}>  
+                            {currentDuration}  
+                          </span>  
+                        </td>  
+   
+                        {/* OFFLINE DURATION */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <span className="text-base font-semibold text-red-600">  
+                            {offlineDuration}  
+                          </span>  
+                        </td>  
+   
+                        {/* SESSIONS */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <div className="flex flex-col space-y-1">  
+                            <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>  
+                              Online: {onlineSessions}  
+                            </span>  
+                            <span className={`text-sm ${userBackground === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>  
+                              Offline: {offlineSessions}  
+                            </span>  
+                            <span className="text-sm text-gray-400">Switches: {totalSwitches}</span>  
+                          </div>  
+                        </td>  
+   
+                        {/* TIMES */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          {renderTimesWithTooltip(activity)}  
+                        </td>  
+   
+                        {/* TOTAL HOURS */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <span className="text-xl font-bold text-green-700">  
+                            {totalHoursDisplay}  
+                          </span>  
+                        </td>  
+   
+                        {/* EFFICIENCY */}  
+                        <td className="px-6 py-4 whitespace-nowrap">  
+                          <div className="flex items-center gap-2">  
+                            <div className="w-16 bg-gray-200 rounded-full h-2.5">  
+                              <div  
+                                className="bg-blue-500 rounded-full h-2.5"  
+                                style={{ width: `${Math.min(efficiency, 100)}%` }}  
+                              ></div>  
+                            </div>  
+                            <span className={`text-base font-medium ${userBackground === 'dark' ? 'text-white' : 'text-gray-700'}`}>  
+                              {efficiency.toFixed(0)}%  
+                            </span>  
+                          </div>  
+                        </td>  
+   
+                        {/* LAST UPDATED */}  
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-gray-500">  
+                          {activity.lastUpdated ? formatTime(activity.lastUpdated) : 'N/A'}  
+                        </td>  
+                      </tr>  
+                    );  
+                  })  
+                )}  
+              </tbody>  
+            </table>  
+          </div>  
+        </div>  
+   
+        {/* SUMMARY FOOTER */}  
+        <div  
+          className={`rounded-xl shadow-sm p-4 border ${userBackground === 'dark' ? 'border-gray-700' : 'border-gray-100'  
+            } ${getCardClass()} w-full`}  
+        >  
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 bg-cyan-700 text-center">  
+            <div>  
+              <p className={`text-base ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>  
+                Total Hours Worked  
+              </p>  
+              <p className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>  
+                {totalHoursWorked}h {remainingMinutesWorked}m  
+              </p>  
+            </div>  
+            <div>  
+              <p className={`text-base ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>  
+                Online Drivers  
+              </p>  
+              <p className="text-2xl font-bold text-green-600">{onlineDrivers}</p>  
+            </div>  
+            <div>  
+              <p className={`text-base ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>  
+                Offline Drivers  
+              </p>  
+              <p className="text-2xl font-bold text-red-600">{offlineDrivers}</p>  
+            </div>  
+            <div>  
+              <p className={`text-base ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>  
+                Average Working Time  
+              </p>  
+              <p className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>  
+                {avgHours}h {avgMinutes}m  
+              </p>  
+            </div>  
+            <div>  
+              <p className={`text-base ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>  
+                Total Sessions  
+              </p>  
+              <p className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>  
+                {filteredActivities.reduce((sum, a) => {  
+                  const online = a.onlineSessions || 0;  
+                  const offline = a.offlineSessions || 0;  
+                  if (online === 0 && offline === 0 && a.driverId) {  
+                    return sum + 1;  
+                  }  
+                  return sum + online + offline;  
+                }, 0)}  
+              </p>  
+            </div>  
+            <div>  
+              <p className={`text-base ${userBackground === 'dark' ? 'text-gray-900' : 'text-gray-800'}`}>  
+                Last Sync  
+              </p>  
+              <p className={`text-2xl font-bold ${userBackground === 'dark' ? 'text-white' : 'text-gray-200'}`}>  
+                {lastSyncTime.toLocaleTimeString()}  
+              </p>  
+            </div>  
+          </div>  
+        </div>  
+      </div>  
+    </div>  
+  );  
 }
